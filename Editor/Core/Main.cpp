@@ -14,7 +14,7 @@ int main() {
     enable_log_level(log_level::warning, option::enable);
     enable_log_level(log_level::error, option::enable);
     enable_log_level(log_level::fatal, option::enable);
-    
+
     LOG_INFO("Started project");
 
     engine_init_info engine_info{};
@@ -34,8 +34,22 @@ int main() {
     window_module.vtable = &table;
     load_module("Iron.Windowing.dll", &window_module);
 
-    factory_windowing factory{ table };
+    factory_windowing factory{ &table };
     factory.initialize();
+
+    window_init_info window_info{};
+    window_info.width = 1024;
+    window_info.height = 768;
+    window_info.title = "Iron Editor";
+
+    window main_window{};
+    factory.create_window(window_info, &main_window);
+
+    while (factory.is_window_open(main_window)) {
+        factory.poll_messages(main_window);
+    }
+
+    factory.destroy_window(main_window);
 
     factory.shutdown();
 

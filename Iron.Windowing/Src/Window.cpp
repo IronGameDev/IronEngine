@@ -12,6 +12,16 @@ LRESULT CALLBACK
 wndproc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     switch (msg)
     {
+    case WM_CLOSE:
+    case WM_DESTROY: {
+        window_t* parent{ get_from_handle(hwnd) };
+        if (!parent) UNLIKELY {
+            LOG_ERROR("Close message send to invalid window!");
+            break;
+        }
+
+        parent->close();
+    } break;
     case WM_NCCREATE: {
         LPCREATESTRUCTA create{ (LPCREATESTRUCTA)lparam };
         window_t* temp{ (window_t*)create->lpCreateParams };
@@ -26,7 +36,7 @@ wndproc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 }//anonymous namespace
 
 window_t::window_t(const window_init_info& init_info)
-    : m_fullscreen(init_info.fullscreen) {
+    : m_fullscreen(init_info.fullscreen), m_open(false) {
 
     WNDCLASSEXA wc{};
     wc.cbSize = sizeof(WNDCLASSEXA);
@@ -69,6 +79,7 @@ window_t::window_t(const window_init_info& init_info)
     ShowWindow(m_hwnd, m_fullscreen ? SW_MAXIMIZE : SW_SHOW);
     UpdateWindow(m_hwnd);
 
+    m_open = true;
     m_error = result::ok;
 }
 

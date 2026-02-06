@@ -5,6 +5,20 @@
 namespace iron {
 namespace {
 result::code
+initialize() {
+    g_config.default_background.r = 24;
+    g_config.default_background.g = 48;
+    g_config.default_background.b = 84;
+
+    return result::ok;
+}
+
+windowing_config*
+get_config() {
+    return &g_config;
+}
+
+result::code
 create_window(const window_init_info& init_info, window* out_handle) {
     window_t* ref{ new window_t(init_info) };
     if (!ref) {
@@ -36,21 +50,17 @@ poll_messages(window handle) {
     ref->pump_messages();
 }
 
-result::code
-initialize() {
-    g_config.default_background.r = 24;
-    g_config.default_background.g = 48;
-    g_config.default_background.b = 84;
+bool
+is_window_open(window handle) {
+    window_t* ref{ handle };
+    if (!ref) {
+        return false;
+    }
 
-    return result::ok;
+    return ref->is_open();
 }
 
 constexpr static version    g_version{ 0, 0, 1 };
-
-windowing_config*
-get_config() {
-    return &g_config;
-}
 }//anonymous namespace
 
 windowing_config            g_config{};
@@ -71,7 +81,8 @@ get_vtable(iron::vtable_windowing* table) {
 
     table->create_window = iron::create_window;
     table->destroy_window = iron::destroy_window;
-    table->poll_messages = nullptr;
+    table->poll_messages = iron::poll_messages;
+    table->is_window_open = iron::is_window_open;
 
     return iron::result::ok;
 }
