@@ -4,8 +4,6 @@
 MAKE_VERSION(input, 0, 2, 0)
 
 namespace iron::input {
-//void* native, u32 msg, u64 wparam, u64 lparam);
-using wnd_proc = void(*)(void*, u32, u64, u64);
 using input_callback = void(*)(input_type, key::code, modifier_key, void*);
 
 struct vtable_input {
@@ -14,7 +12,7 @@ struct vtable_input {
     result::code(*initialize)();
     void(*shutdown)();
 
-    wnd_proc(*get_input_proc)();
+    void(*input_proc)(void*, u32, u64, u64);
     
     void(*register_callback)(input_callback callback, void* user_data);
     void(*unregister_callback)(input_callback callback);
@@ -27,7 +25,7 @@ public:
         m_table = table;
         CHECK_TABLE(initialize);
         CHECK_TABLE(shutdown);
-        CHECK_TABLE(get_input_proc);
+        CHECK_TABLE(input_proc);
         CHECK_TABLE(register_callback);
         CHECK_TABLE(unregister_callback);
     }
@@ -48,12 +46,12 @@ public:
         m_table->shutdown();
     }
 
-    wnd_proc get_input_proc() const {
-        if (!(m_table && m_table->get_input_proc)) UNLIKELY{
-            INVALID_TABLE(get_input_proc);
-            return nullptr;
+    void input_proc(void* hwnd, u32 msg, u64 wparam, u64 lparam) const {
+        if (!(m_table && m_table->input_proc)) UNLIKELY{
+            INVALID_TABLE(input_proc);
+            return;
         }
-        return m_table->get_input_proc();
+        m_table->input_proc(hwnd, msg, wparam, lparam);
     }
 
     void register_callback(input_callback cb, void* user_data) const {
