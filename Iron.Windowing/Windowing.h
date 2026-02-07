@@ -3,8 +3,12 @@
 
 MAKE_VERSION(windowing, 0, 1, 0)
 
-namespace iron {
+namespace iron::window {
 typedef class window_t* window;
+
+struct window_init_info;
+struct vtable_windowing;
+class factory_windowing;
 
 struct window_message {
     enum msg : u32 {

@@ -3,7 +3,7 @@
 
 #include <Windows.h>
 
-namespace iron {
+namespace iron::window {
 class window_t {
 public:
     window_t(const window_init_info& init_info);

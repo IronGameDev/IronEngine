@@ -2,7 +2,7 @@
 #include <Iron.Windowing/Src/Config.h>
 #include <Iron.Windowing/Src/Window.h>
 
-namespace iron {
+namespace iron::window {
 namespace {
 result::code
 initialize() {
@@ -68,21 +68,21 @@ windowing_config            g_config{};
 
 extern "C" __declspec(dllexport)
 iron::result::code
-get_vtable(iron::vtable_windowing* table) {
+get_vtable(iron::window::vtable_windowing* table) {
     if (!table) {
         return iron::result::e_nullptr;
     }
 
-    table->api_version = iron::g_version;
+    table->api_version = iron::window::g_version;
     
-    table->initialize = iron::initialize;
+    table->initialize = iron::window::initialize;
     table->shutdown = nullptr;
-    table->get_config = iron::get_config;
+    table->get_config = iron::window::get_config;
 
-    table->create_window = iron::create_window;
-    table->destroy_window = iron::destroy_window;
-    table->poll_messages = iron::poll_messages;
-    table->is_window_open = iron::is_window_open;
+    table->create_window = iron::window::create_window;
+    table->destroy_window = iron::window::destroy_window;
+    table->poll_messages = iron::window::poll_messages;
+    table->is_window_open = iron::window::is_window_open;
 
     return iron::result::ok;
 }

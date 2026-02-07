@@ -22,6 +22,8 @@ typedef signed long long s64;
 
 typedef float f32;
 
+typedef u32 type_id;
+
 struct option {
     enum value : u8 {
         disable = 0,
@@ -96,7 +98,7 @@ struct result {
         e_createwindow,
         e_loadlibrary,
         e_getvtable,
-        
+
         count,
     };
 
@@ -117,6 +119,96 @@ struct log_level {
         error,
         fatal,
         count,
+    };
+};
+
+struct input_type {
+    enum type : u32 {
+        press = 0,
+        release,
+        hold
+    };
+};
+
+struct key {
+    enum code : u32 {
+        key_a,
+        key_b,
+        key_c,
+        key_d,
+        key_e,
+        key_f,
+        key_g,
+        key_h,
+        key_i,
+        key_j,
+        key_k,
+        key_l,
+        key_m,
+        key_n,
+        key_o,
+        key_p,
+        key_q,
+        key_r,
+        key_s,
+        key_t,
+        key_u,
+        key_v,
+        key_w,
+        key_x,
+        key_y,
+        key_z,
+        key_1,
+        key_2,
+        key_3,
+        key_4,
+        key_5,
+        key_6,
+        key_7,
+        key_8,
+        key_9,
+        key_0,
+        key_f1,
+        key_f2,
+        key_f3,
+        key_f4,
+        key_f5,
+        key_f6,
+        key_f7,
+        key_f8,
+        key_f9,
+        key_f10,
+        key_f11,
+        key_f12,
+        key_shift,
+        key_alt,
+        key_control,
+        key_enter,
+        key_space,
+        key_num_1,
+        key_num_2,
+        key_num_3,
+        key_num_4,
+        key_num_5,
+        key_num_6,
+        key_num_7,
+        key_num_8,
+        key_num_9,
+        key_num_0,
+        key_caps,
+        key_home,
+        key_page_up,
+        key_page_down,
+        key_delete,
+        key_escape,
+    };
+};
+
+struct modifier_key {
+    enum code : u32 {
+        shift = key::key_shift,
+        alt = key::key_alt,
+        control = key::key_control,
     };
 };
 
@@ -310,7 +402,7 @@ public:
     size_t allocate() {
         if (m_free_head != npos) {
             const size_t index{ m_free_head };
-            m_free_head{ read_next(index) };
+            m_free_head = read_next(index);
             return index;
         }
 
@@ -367,4 +459,222 @@ private:
         *(size_t*)(&m_data[(u32)index]) = next;
     }
 };
+
+namespace math {
+CORE_API f32 sqrt_f(f32 value);
+
+constexpr f32 constexpr_rsqrt(f32 x) noexcept {
+    if (x <= 0.0f) return 0.0f;
+
+    f32 y{ 1.0f };
+    for (u32 i{ 0 }; i < 6; ++i) {
+        y = y * (1.5f - 0.5f * x * y * y);
+    }
+    return y;
 }
+
+template <typename V, int N>
+struct vec_base;
+
+template <typename V>
+struct vec_base<V, 2> {
+    f32 x, y;
+
+    constexpr vec_base() noexcept : x(), y() {}
+    constexpr explicit vec_base(f32 v) noexcept : x(v), y(v) {}
+    constexpr vec_base(f32 x_, f32 y_) noexcept : x(x_), y(y_) {}
+
+    constexpr bool operator==(const V& o) const noexcept {
+        return x == o.x && y == o.y;
+    }
+
+    constexpr bool operator!=(const V& o) const noexcept {
+        return !(*this == o);
+    }
+
+    constexpr V& operator+=(const V& o) noexcept {
+        x += o.x; y += o.y;
+        return static_cast<V&>(*this);
+    }
+
+    constexpr V& operator-=(const V& o) noexcept {
+        x -= o.x; y -= o.y;
+        return static_cast<V&>(*this);
+    }
+
+    constexpr V& operator*=(f32 s) noexcept {
+        x *= s; y *= s;
+        return static_cast<V&>(*this);
+    }
+
+    constexpr V& operator/=(f32 s) noexcept {
+        x /= s; y /= s;
+        return static_cast<V&>(*this);
+    }
+};
+
+template <typename V>
+struct vec_base<V, 3> {
+    f32 x, y, z;
+
+    constexpr vec_base() noexcept : x(), y(), z() {}
+    constexpr explicit vec_base(f32 v) noexcept : x(v), y(v), z(v) {}
+    constexpr vec_base(f32 x_, f32 y_, f32 z_) noexcept : x(x_), y(y_), z(z_) {}
+
+    constexpr bool operator==(const V& o) const noexcept {
+        return x == o.x && y == o.y && z == o.z;
+    }
+
+    constexpr bool operator!=(const V& o) const noexcept {
+        return !(*this == o);
+    }
+
+    constexpr V& operator+=(const V& o) noexcept {
+        x += o.x; y += o.y; z += o.z;
+        return static_cast<V&>(*this);
+    }
+
+    constexpr V& operator-=(const V& o) noexcept {
+        x -= o.x; y -= o.y; z -= o.z;
+        return static_cast<V&>(*this);
+    }
+
+    constexpr V& operator*=(f32 s) noexcept {
+        x *= s; y *= s; z *= s;
+        return static_cast<V&>(*this);
+    }
+
+    constexpr V& operator/=(f32 s) noexcept {
+        x /= s; y /= s; z /= s;
+        return static_cast<V&>(*this);
+    }
+};
+
+struct v2 : vec_base<v2, 2> {
+    using vec_base::vec_base;
+};
+
+struct v3 : vec_base<v3, 3> {
+    using vec_base::vec_base;
+};
+
+template <typename V>
+constexpr V operator+(V a, const V& b) noexcept {
+    return a += b;
+}
+
+template <typename V>
+constexpr V operator-(V a, const V& b) noexcept {
+    return a -= b;
+}
+
+template <typename V>
+constexpr V operator*(V v, f32 s) noexcept {
+    return v *= s;
+}
+
+template <typename V>
+constexpr V operator*(f32 s, V v) noexcept {
+    return v *= s;
+}
+
+template <typename V>
+constexpr V operator/(V v, f32 s) noexcept {
+    return v /= s;
+}
+
+template <typename V>
+constexpr V operator-(const V& v) noexcept {
+    V r = v;
+    r *= -1.0f;
+    return r;
+}
+
+template <typename V>
+constexpr V operator+(const V& v) noexcept {
+    return v;
+}
+
+constexpr f32 dot(const v2& a, const v2& b) noexcept {
+    return a.x * b.x + a.y * b.y;
+}
+
+constexpr f32 dot(const v3& a, const v3& b) noexcept {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+constexpr f32 cross(const v2& a, const v2& b) noexcept {
+    return a.x * b.y - a.y * b.x;
+}
+
+constexpr v3 cross(const v3& a, const v3& b) noexcept {
+    return {
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x
+    };
+}
+
+constexpr f32 length_sq(const v2& v) noexcept {
+    return dot(v, v);
+}
+
+constexpr f32 length_sq(const v3& v) noexcept {
+    return dot(v, v);
+}
+
+inline f32 length(const v2& v) noexcept {
+    return sqrt_f(length_sq(v));
+}
+
+inline f32 length(const v3& v) noexcept {
+    return sqrt_f(length_sq(v));
+}
+
+inline v2 normalize(const v2& v) noexcept {
+    const f32 len_sq = length_sq(v);
+    if (len_sq == 0.0f) return {};
+
+    return v / sqrt_f(len_sq);
+}
+
+inline v3 normalize(const v3& v) noexcept {
+    const f32 len_sq = length_sq(v);
+    if (len_sq == 0.0f) return {};
+
+    return v / sqrt_f(len_sq);
+}
+
+constexpr v2 normalize_constexpr(const v2& v) noexcept {
+    const f32 len_sq = length_sq(v);
+    if (len_sq == 0.0f) return {};
+
+    return v * constexpr_rsqrt(len_sq);
+}
+
+constexpr v3 normalize_constexpr(const v3& v) noexcept {
+    const f32 len_sq = length_sq(v);
+    if (len_sq == 0.0f) return {};
+
+    return v * constexpr_rsqrt(len_sq);
+}
+
+constexpr v2 xy(const v2& v) noexcept { return v; }
+constexpr v2 yx(const v2& v) noexcept { return { v.y, v.x }; }
+
+constexpr v2 xy(const v3& v) noexcept { return { v.x, v.y }; }
+constexpr v2 xz(const v3& v) noexcept { return { v.x, v.z }; }
+constexpr v2 yz(const v3& v) noexcept { return { v.y, v.z }; }
+
+constexpr v2 yx(const v3& v) noexcept { return { v.y, v.x }; }
+constexpr v2 zx(const v3& v) noexcept { return { v.z, v.x }; }
+constexpr v2 zy(const v3& v) noexcept { return { v.z, v.y }; }
+
+constexpr v3 xyz(const v3& v) noexcept { return v; }
+constexpr v3 xzy(const v3& v) noexcept { return { v.x, v.z, v.y }; }
+constexpr v3 yxz(const v3& v) noexcept { return { v.y, v.x, v.z }; }
+constexpr v3 yzx(const v3& v) noexcept { return { v.y, v.z, v.x }; }
+constexpr v3 zxy(const v3& v) noexcept { return { v.z, v.x, v.y }; }
+constexpr v3 zyx(const v3& v) noexcept { return { v.z, v.y, v.x }; }
+}//math namespace
+}//iron namespace

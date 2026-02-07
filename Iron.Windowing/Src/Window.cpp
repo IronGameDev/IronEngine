@@ -1,7 +1,7 @@
 #include <Iron.Windowing/Src/Window.h>
 #include <Iron.Windowing/Src/Config.h>
 
-namespace iron {
+namespace iron::window {
 namespace {
 window_t*
 get_from_handle(HWND hwnd) {

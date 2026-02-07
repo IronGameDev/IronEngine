@@ -6,6 +6,7 @@
 #pragma comment(lib, "iron.engine.lib")
 
 using namespace iron;
+using namespace iron::window;
 
 int main() {
     enable_log_include_path(option::enable);
@@ -42,7 +43,7 @@ int main() {
     window_info.height = 768;
     window_info.title = "Iron Editor";
 
-    window main_window{};
+    ::iron::window::window main_window{};
     factory.create_window(window_info, &main_window);
 
     while (factory.is_window_open(main_window)) {
