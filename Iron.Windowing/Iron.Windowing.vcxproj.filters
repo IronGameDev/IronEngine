@@ -32,7 +32,7 @@
     <ClInclude Include="Src\Window.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Src\Config.h">
+    <ClInclude Include="Src\ModuleState.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

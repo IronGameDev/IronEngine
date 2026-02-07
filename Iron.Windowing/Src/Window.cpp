@@ -1,5 +1,5 @@
 #include <Iron.Windowing/Src/Window.h>
-#include <Iron.Windowing/Src/Config.h>
+#include <Iron.Windowing/Src/ModuleState.h>
 
 namespace iron::window {
 namespace {
@@ -35,7 +35,7 @@ wndproc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 }
 }//anonymous namespace
 
-window_t::window_t(const window_init_info& init_info)
+window_t::window_t(windowing_state_t* state, const window_init_info& init_info)
     : m_fullscreen(init_info.fullscreen), m_open(false) {
 
     WNDCLASSEXA wc{};
@@ -45,16 +45,12 @@ window_t::window_t(const window_init_info& init_info)
     wc.cbClsExtra = 0;
     wc.cbWndExtra = 0;
     wc.hInstance = 0;
-    wc.hIcon = LoadIcon(0, IDI_APPLICATION);
+    wc.hIcon = state->get_icon();
     wc.hCursor = LoadCursor(0, IDC_ARROW);
-    wc.hbrBackground = CreateSolidBrush(RGB(
-        g_config.default_background.r,
-        g_config.default_background.g,
-        g_config.default_background.b
-    ));
+    wc.hbrBackground = CreateSolidBrush(state->get_background_color());
     wc.lpszMenuName = "";
     wc.lpszClassName = "ironwndclass";
-    wc.hIconSm = LoadIcon(0, IDI_APPLICATION);
+    wc.hIconSm = state->get_icon();
 
     RegisterClassExA(&wc);
 
@@ -78,6 +74,11 @@ window_t::window_t(const window_init_info& init_info)
 
     ShowWindow(m_hwnd, m_fullscreen ? SW_MAXIMIZE : SW_SHOW);
     UpdateWindow(m_hwnd);
+
+    const DWORD color{ state->get_titlebar_color() };
+
+    DwmSetWindowAttribute(m_hwnd, DWMWA_CAPTION_COLOR, &color, sizeof(color));
+    DwmSetWindowAttribute(m_hwnd, DWMWA_BORDER_COLOR, &color, sizeof(color));
 
     m_open = true;
     m_error = result::ok;

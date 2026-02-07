@@ -1,12 +1,13 @@
 #pragma once
 #include <Iron.Windowing/Windowing.h>
+#include <Iron.Windowing/Src/ModuleState.h>
 
 #include <Windows.h>
 
 namespace iron::window {
 class window_t {
 public:
-    window_t(const window_init_info& init_info);
+    window_t(windowing_state_t* state, const window_init_info& init_info);
     ~window_t();
 
     void pump_messages();

@@ -146,7 +146,7 @@
     <ClCompile Include="Src\Windowing.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Src\Config.h" />
+    <ClInclude Include="Src\ModuleState.h" />
     <ClInclude Include="Src\Window.h" />
     <ClInclude Include="Windowing.h" />
   </ItemGroup>

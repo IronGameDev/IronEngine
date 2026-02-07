@@ -71,9 +71,9 @@ struct version {
 
 #ifndef INVALID_TABLE
 #define INVALID_TABLE(func) LOG_ERROR("Vtable function %s() was called, but not implemented!", #func);
-#define CHECK_TABLE(func) if(!(m_table && m_table->func)) {                                                                   \
-LOG_WARNING("Failed to get vtable function %s(), this is fine as long as the user does not call this function",   \
-#func); }
+#define CHECK_TABLE(func, complete) if(!m_table.func) {                                                         \
+LOG_WARNING("Failed to get vtable function %s(), this is fine as long as the user does not call this function", \
+#func); complete = false; }
 #endif
 
 #ifndef UNLIKELY
@@ -108,6 +108,18 @@ struct result {
 
     constexpr static inline bool fail(code c) {
         return c != ok;
+    }
+};
+
+struct module_state {
+    enum state : u32 {
+        complete = 0,
+        incomplete,
+        invalid
+    };
+
+    constexpr static inline bool is_valid(state s) {
+        return s != invalid;
     }
 };
 
@@ -461,6 +473,8 @@ private:
 };
 
 namespace math {
+constexpr static inline f32 inv_255{ 1.f / 255.f };
+
 CORE_API f32 sqrt_f(f32 value);
 
 constexpr f32 constexpr_rsqrt(f32 x) noexcept {

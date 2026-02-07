@@ -35,8 +35,10 @@ int main() {
     window_module.vtable = &table;
     load_module("Iron.Windowing.dll", &window_module);
 
-    factory_windowing factory{ &table };
-    factory.initialize();
+    factory_windowing factory{ table };
+    factory.set_default_background({ 0.1f, 0.2f, 0.4f });
+    factory.set_default_titlebar({ 0.2f, 0.2f, 0.2f });
+    factory.set_icon("D:\\code\\IronEngine\\iron.ico", { 32, 32 });
 
     window_init_info window_info{};
     window_info.width = 1024;
@@ -51,8 +53,7 @@ int main() {
     }
 
     factory.destroy_window(main_window);
-
-    factory.shutdown();
+    factory.destroy();
 
     unload_module(window_module);
 

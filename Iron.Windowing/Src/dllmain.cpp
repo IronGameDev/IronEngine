@@ -2,6 +2,7 @@
 #include <Windows.h>
 
 #pragma comment(lib, "iron.core.lib")
+#pragma comment(lib, "dwmapi.lib")
 
 BOOL APIENTRY DllMain(HMODULE hModule,
     DWORD  ul_reason_for_call,
