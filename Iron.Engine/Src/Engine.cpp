@@ -28,11 +28,14 @@ engine_initialize(const engine_init_info& init_info) {
         init_info.app_version.minor,
         init_info.app_version.patch);
 
+    g_context.parse_command_args(init_info.argc, init_info.argv);
+
     return result::ok;
 }
 
 void
 engine_shutdown() {
+    g_context.reset();
 }
 
 void*

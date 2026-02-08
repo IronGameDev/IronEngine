@@ -23,6 +23,8 @@ struct engine_api {
 struct engine_init_info {
     const char*     app_name;
     version         app_version;
+    s32             argc;
+    char**          argv;
 };
 
 struct engine_module {

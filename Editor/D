@@ -1,0 +1,7 @@
+[engine.log]
+enable_debug=1
+enable_info=1
+enable_warning=1
+enable_error=1
+enable_fatal=1
+enable_filename=1

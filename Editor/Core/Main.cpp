@@ -8,14 +8,14 @@
 using namespace iron;
 using namespace iron::window;
 
-int main() {
-    LOG_INFO("Started project");
-
+int main(int argc, char** argv) {
     engine_init_info engine_info{};
     engine_info.app_name = "Engine Editor";
     engine_info.app_version.major = 12;
     engine_info.app_version.minor = 42;
     engine_info.app_version.patch = 948;
+    engine_info.argc = argc;
+    engine_info.argv = argv;
 
     result::code result{};
     result = engine_initialize(engine_info);

@@ -140,6 +140,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Src\dllmain.cpp" />
+    <ClCompile Include="Src\ConfigFile.cpp" />
     <ClCompile Include="Src\Log.cpp" />
     <ClCompile Include="Src\Math.cpp" />
     <ClCompile Include="Src\Memory.cpp" />

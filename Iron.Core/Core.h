@@ -99,6 +99,8 @@ struct result {
         e_loadlibrary,
         e_getvtable,
         e_sizemismatch,
+        e_loadfile,
+        e_writefile,
 
         count,
     };
@@ -259,6 +261,7 @@ CORE_API void enable_log_level(log_level::level level, option::value enable);
 CORE_API void enable_log_include_path(option::value enable);
 CORE_API void log_error(result::code code, const char* file, int line);
 
+//Important! No constructors/destructors will be called here!
 template<typename T>
 class vector {
 public:
@@ -290,18 +293,6 @@ public:
         if (m_data) {
             mem_free(m_data);
         }
-    }
-
-    inline u32 size() const {
-        return m_size;
-    }
-
-    inline u32 capacity() const {
-        return m_capacity;
-    }
-
-    inline bool empty() const {
-        return m_size == 0;
     }
 
     void reserve(u32 new_capacity) {
@@ -363,28 +354,40 @@ public:
         return m_data[index];
     }
 
-    T* data() {
+    inline T* data() {
         return m_data;
     }
 
-    const T* data() const {
+    inline const T* data() const {
         return m_data;
     }
 
-    T* begin() {
+    inline T* begin() {
         return m_data;
     }
 
-    const T* begin() const {
+    inline const T* begin() const {
         return m_data;
     }
 
-    T* end() {
+    inline T* end() {
         return &m_data[m_size];
     }
 
-    const T* end() const {
+    inline const T* end() const {
         return &m_data[m_size];
+    }
+
+    constexpr u32 size() const {
+        return m_size;
+    }
+
+    constexpr u32 capacity() const {
+        return m_capacity;
+    }
+
+    constexpr bool empty() const {
+        return m_size == 0;
     }
 
 private:
@@ -446,7 +449,7 @@ public:
         return m_data.data();
     }
 
-    size_t size() const {
+    constexpr size_t size() const {
         return m_data.size();
     }
 
@@ -472,6 +475,36 @@ private:
     inline void write_next(size_t index, size_t next) {
         *(size_t*)(&m_data[(u32)index]) = next;
     }
+};
+
+class config_file {
+public:
+    config_file() = default;
+    CORE_API ~config_file();
+
+    CORE_API result::code load(const char* file);
+    CORE_API result::code save(const char* path) const;
+
+    CORE_API void set(
+        const char* section,
+        const char* keyword,
+        const char* value);
+    
+    CORE_API const char* get(
+        const char* section,
+        const char* keyword,
+        const char* defaultValue = nullptr) const;
+
+    CORE_API void clear();
+
+private:
+    struct entry {
+        const char* section;
+        const char* keyword;
+        const char* value;
+    };
+
+    vector<entry>   m_entries{};
 };
 
 namespace math {

@@ -14,6 +14,8 @@ public:
 
     void* const get_vtable(u64 id) const;
 
+    void reset();
+
 private:
     std::unordered_map<u64, engine_module>  m_modules{};
 };
