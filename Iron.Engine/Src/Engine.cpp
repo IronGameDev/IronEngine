@@ -17,7 +17,7 @@ version             g_app_version{};
 }//anonymous namespace
 
 result::code
-engine_initialize(const engine_init_info& init_info) {
+run_engine(const engine_init_info& init_info, application* const app) {
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
     g_app_version = init_info.app_version;
@@ -30,34 +30,17 @@ engine_initialize(const engine_init_info& init_info) {
 
     g_context.parse_command_args(init_info.argc, init_info.argv);
 
-    return result::ok;
+    return g_context.run(init_info, app);
 }
 
 void
-engine_shutdown() {
-    g_context.reset();
+request_quit() {
+    g_context.m_running = false;
 }
 
-void*
-get_module_vtable(engine_api::api api, u64 buffer_size)
-{
-    switch (api)
-    {
-    case engine_api::windowing:
-        return g_context.load_and_get_vtable("Iron.Windowing.dll", buffer_size);
-    case engine_api::renderer:
-        break;
-    case engine_api::input:
-        return g_context.load_and_get_vtable("Iron.Input.dll", buffer_size);
-    case engine_api::audio:
-        break;
-    case engine_api::filesystem:
-        break;
-    default:
-        break;
-    }
-
-    return nullptr;
+void* const
+get_engine_api(engine_api::api api) {
+    return g_context.get_engine_api(api);
 }
 
 version

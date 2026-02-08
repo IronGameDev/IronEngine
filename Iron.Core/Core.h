@@ -58,6 +58,15 @@ struct version {
     }
 };
 
+constexpr static u64 fnv1a(const char* str) {
+    u64 hash = 14695981039346656037ull;
+    while (*str) {
+        hash ^= static_cast<u8>(*str++);
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
 #ifdef _DEBUG
 #define LOG_DEBUG(x, ...) ::iron::log(::iron::log_level::debug, __FILE__, __LINE__, x, __VA_ARGS__)
 #else
@@ -101,6 +110,7 @@ struct result {
         e_sizemismatch,
         e_loadfile,
         e_writefile,
+        e_nointerface,
 
         count,
     };

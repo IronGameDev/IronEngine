@@ -1,4 +1,4 @@
-#include <Iron.Engine/Engine.h>
+﻿#include <Iron.Engine/Engine.h>
 
 #include <Windows.h>
 #include "Modules.h"
@@ -36,23 +36,28 @@ module_manager::load_module(const char* path, u64 id, u64 buffer_size) {
     res = func(mod.vtable, buffer_size);
     if (result::fail(res)) {
         mem_free(mod.vtable);
+        FreeLibrary((HMODULE)mod.library);
         return res;
     }
-
+    
     LOG_INFO("Loaded module %s Id=%ull", path, id);
     m_modules[id] = mod;
 
     return res;
 }
 
-void
-module_manager::unload_module(u64 id) {
-    auto pair{ m_modules.find(id) };
-    if (pair != m_modules.end() && engine_module::is_loaded(pair->second)) {
-        FreeLibrary((HMODULE)pair->second.library);
-        mem_free(pair->second.vtable);
-        m_modules[id] = {};
+void module_manager::unload_module(u64 id) {
+    auto it{ m_modules.find(id) };
+    if (it == m_modules.end())
+        return;
+
+    engine_module& mod{ it->second };
+    if (engine_module::is_loaded(mod)) {
+        FreeLibrary((HMODULE)mod.library);
+        mem_free(mod.vtable);
     }
+
+    m_modules.erase(it);
 }
 
 void* const
@@ -67,13 +72,18 @@ module_manager::get_vtable(u64 id) const {
 
 void
 module_manager::reset() {
-    for (auto& pair : m_modules) {
-        if (engine_module::is_loaded(pair.second)) {
-            LOG_WARNING("Dll Id=%ull was not unloaded!", pair.second.id);
-            unload_module(pair.first);
+    for (auto it{ m_modules.begin() }; it != m_modules.end(); ) {
+        if (engine_module::is_loaded(it->second)) {
+            LOG_WARNING("Dll Id=%ull was not unloaded!", it->second.id);
+
+            FreeLibrary((HMODULE)it->second.library);
+            mem_free(it->second.vtable);
+
+            it = m_modules.erase(it);
+        }
+        else {
+            ++it;
         }
     }
-
-    m_modules = {};
 }
 }

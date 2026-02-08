@@ -16,15 +16,24 @@ struct engine_api {
         renderer,
         input,
         audio,
-        filesystem
+        filesystem,
+        count
     };
 };
 
 struct engine_init_info {
-    const char*     app_name;
-    version         app_version;
-    s32             argc;
-    char**          argv;
+    const char*         app_name;
+    version             app_version;
+    s32                 argc;
+    char**              argv;
+    option::value       headless;
+
+    struct {
+        u32             width{ 1024 };
+        u32             height{ 768 };
+        const char*     title{ "Iron Game" };
+        option::value   fullscreen{ false };
+    } window;
 };
 
 struct engine_module {
@@ -52,33 +61,48 @@ struct engine_module {
     }
 };
 
-constexpr static module_id fnv1a(const char* str) {
-    module_id hash = 14695981039346656037ull;
-    while (*str) {
-        hash ^= static_cast<u8>(*str++);
-        hash *= 1099511628211ull;
-    }
-    return hash;
-}
+class application {
+public:
+    virtual ~application() = default;
 
-constexpr module_id operator"" _mid(const char* str, size_t) {
-    return fnv1a(str);
-}
+    //Before window / renderer creation
+    //Will only run in non-headless mode
+    virtual result::code pre_initialize() = 0;
+    
+    //After window / renderer creation
+    //Should be used with headless mode
+    virtual result::code post_initialize() = 0;
+    
+    virtual void frame() = 0;
+    virtual void shutdown() = 0;
+};
 
-ENGINE_API result::code engine_initialize(const engine_init_info& init_info);
-ENGINE_API void engine_shutdown();
+/// <summary>
+/// Starts and runs the engine
+/// </summary>
+/// <param name="init_info"></param>
+/// <param name="app"></param>
+/// <returns></returns>
+ENGINE_API result::code run_engine(const engine_init_info& init_info, application* app);
+
+/// <summary>
+/// This is how the user notifies the engine to stop running
+/// </summary>
+/// <returns></returns>
+ENGINE_API void request_quit();
 
 /// <summary>
 /// Get an engine module
+/// NEVER call destroy on these factories, this will cause UB
 /// </summary>
 /// <param name="api">Requested API</param>
-/// <param name="buffer_size">MUST be sizeof(vtable_module)</param>
-/// <returns>vtable_module*</returns>
-ENGINE_API void* get_module_vtable(engine_api::api api, u64 buffer_size);
+/// <returns>initialized factory_module*</returns>
+ENGINE_API void* const get_engine_api(engine_api::api api);
 
 ////User Plugins???
 //ENGINE_API result::code load_module(const char* path, engine_module* handle);
 //ENGINE_API void unload_module(engine_module handle);
 
+//Deprecated!
 ENGINE_API version get_app_version();
 }
