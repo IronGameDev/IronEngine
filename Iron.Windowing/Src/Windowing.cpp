@@ -114,9 +114,13 @@ constexpr static version    g_version{ 0, 1, 0 };
 
 extern "C" __declspec(dllexport)
 iron::result::code
-get_vtable(iron::window::vtable_windowing* table) {
+get_vtable(iron::window::vtable_windowing* table, u64 buffer_size) {
     if (!table) {
         return iron::result::e_nullptr;
+    }
+
+    if (buffer_size != sizeof(iron::window::vtable_windowing)) {
+        return iron::result::e_sizemismatch;
     }
 
     table->api_version = iron::window::g_version;

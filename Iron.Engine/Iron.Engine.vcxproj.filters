@@ -24,7 +24,7 @@
     <ClCompile Include="Src\Modules\Modules.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Modules\WindowManager.cpp">
+    <ClCompile Include="Src\EngineContext.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -32,7 +32,10 @@
     <ClInclude Include="Engine.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Src\Modules\WindowManager.h">
+    <ClInclude Include="Src\Modules\Modules.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\EngineContext.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

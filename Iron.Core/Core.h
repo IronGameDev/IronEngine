@@ -71,7 +71,7 @@ struct version {
 
 #ifndef INVALID_TABLE
 #define INVALID_TABLE(func) LOG_ERROR("Vtable function %s() was called, but not implemented!", #func);
-#define CHECK_TABLE(func, complete) if(!m_table.func) {                                                         \
+#define CHECK_TABLE(func, complete) if(!(m_table && m_table->func)) {                                           \
 LOG_WARNING("Failed to get vtable function %s(), this is fine as long as the user does not call this function", \
 #func); complete = false; }
 #endif
@@ -98,6 +98,7 @@ struct result {
         e_createwindow,
         e_loadlibrary,
         e_getvtable,
+        e_sizemismatch,
 
         count,
     };
@@ -107,7 +108,8 @@ struct result {
     }
 
     constexpr static inline bool fail(code c) {
-        return c != ok;
+        return !(c == ok
+            || c == e_incomplete);
     }
 };
 

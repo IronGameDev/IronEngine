@@ -9,13 +9,6 @@ using namespace iron;
 using namespace iron::window;
 
 int main() {
-    enable_log_include_path(option::enable);
-    enable_log_level(log_level::debug, option::enable);
-    enable_log_level(log_level::info, option::enable);
-    enable_log_level(log_level::warning, option::enable);
-    enable_log_level(log_level::error, option::enable);
-    enable_log_level(log_level::fatal, option::enable);
-
     LOG_INFO("Started project");
 
     engine_init_info engine_info{};
@@ -30,10 +23,7 @@ int main() {
         return -1;
     }
 
-    vtable_windowing table{};
-    engine_module window_module{};
-    window_module.vtable = &table;
-    load_module("Iron.Windowing.dll", &window_module);
+    vtable_windowing* table{ (vtable_windowing*)get_module_vtable(engine_api::windowing, sizeof(vtable_windowing)) };
 
     factory_windowing factory{ table };
     factory.set_default_background({ 0.1f, 0.2f, 0.4f });
@@ -54,8 +44,6 @@ int main() {
 
     factory.destroy_window(main_window);
     factory.destroy();
-
-    unload_module(window_module);
 
     engine_shutdown();
 
