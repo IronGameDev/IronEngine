@@ -5,45 +5,46 @@
 
 #include <filesystem>
 
-namespace iron {
-class engine_context {
+namespace Iron {
+
+class EngineContext {
 public:
-    engine_context();
-    ~engine_context();
+    EngineContext();
+    ~EngineContext();
 
-    result::code run(const engine_init_info& info, application* const app);
+    Result::Code Run(const EngineInitInfo& Info, Application* const App);
 
-    module_manager              m_modules{};
-    
-    std::vector<std::string>    m_cmd_args{};
-    engine_init_info            m_init_info{};
+    ModuleManager               m_Modules{};
 
-    std::filesystem::path       m_engine_dir{};
+    std::vector<std::string>    m_CmdArgs{};
+    EngineInitInfo              m_InitInfo{};
 
-    window::factory_windowing   m_windowing{};
-    iron::window::window        m_window{};
+    std::filesystem::path       m_EngineDir{};
 
-    std::atomic<bool>           m_running{};
+    Window::IWindowFactory*     m_WindowFactory{};
+    Window::IWindow*            m_MainWindow{};
 
-public:
-    void* load_and_get_vtable(const char* dllName, u64 buffer_size);
-    void* const get_engine_api(engine_api::api api);
-    void parse_command_args(s32 argc, char** argv);
-
-    void reset();
+    std::atomic<bool>           m_Running{};
 
 public:
-    //Log config
-    bool                    m_log_enable_debug : 1;
-    bool                    m_log_enable_info : 1;
-    bool                    m_log_enable_warning : 1;
-    bool                    m_log_enable_error : 1;
-    bool                    m_log_enable_fatal : 1;
-    bool                    m_log_enable_filename : 1;
+    IObjectBase* const LoadAndGetFactory(const char* DllName);
+    IObjectBase* const GetEngineAPI(EngineAPI::Api Api);
+    void ParseCommandArgs(s32 ArgC, char** ArgV);
 
-    //Disable windowing and rendering
-    bool                    m_headless : 1;
+    void Reset();
+
+public:
+    // Log config
+    bool m_LogEnableDebug : 1;
+    bool m_LogEnableInfo : 1;
+    bool m_LogEnableWarning : 1;
+    bool m_LogEnableError : 1;
+    bool m_LogEnableFatal : 1;
+    bool m_LogEnableFilename : 1;
+
+    // Disable windowing and rendering
+    bool m_Headless : 1;
 };
 
-extern engine_context g_context;
+extern EngineContext g_Context;
 }

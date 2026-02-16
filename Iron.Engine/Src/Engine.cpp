@@ -7,44 +7,46 @@
 #include <filesystem>
 
 /// <summary>
-/// TODO: Remove this file and refactor to engine context?
-/// Or: use this file as translation code to engine context?
+/// TODO: Remove this file and refactor to EngineContext?
+/// Or: use this file as translation code to EngineContext?
 /// </summary>
 
-namespace iron {
+namespace Iron {
 namespace {
-version             g_app_version{};
-}//anonymous namespace
 
-result::code
-run_engine(const engine_init_info& init_info, application* const app) {
+Version g_AppVersion{};
+
+} // anonymous namespace
+
+Result::Code
+RunEngine(const EngineInitInfo& InitInfo, Application* const App) {
     _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
-    g_app_version = init_info.app_version;
+    g_AppVersion = InitInfo.AppVersion;
 
     LOG_INFO("Initializing engine, App=%s Version=%u:%u:%u",
-        init_info.app_name,
-        init_info.app_version.major,
-        init_info.app_version.minor,
-        init_info.app_version.patch);
+        InitInfo.AppName,
+        InitInfo.AppVersion.Major,
+        InitInfo.AppVersion.Minor,
+        InitInfo.AppVersion.Patch);
 
-    g_context.parse_command_args(init_info.argc, init_info.argv);
+    g_Context.ParseCommandArgs(InitInfo.ArgC, InitInfo.ArgV);
 
-    return g_context.run(init_info, app);
+    return g_Context.Run(InitInfo, App);
 }
 
 void
-request_quit() {
-    g_context.m_running = false;
+RequestQuit() {
+    g_Context.m_Running = false;
 }
 
 void* const
-get_engine_api(engine_api::api api) {
-    return g_context.get_engine_api(api);
+GetEngineAPI(EngineAPI::Api Api) {
+    return g_Context.GetEngineAPI(Api);
 }
 
-version
-get_app_version() {
-    return g_app_version;
+Version
+GetAppVersion() {
+    return g_AppVersion;
 }
 }

@@ -2,9 +2,9 @@
 
 #include <Windows.h>
 
-namespace iron {
+namespace Iron {
 namespace {
-constexpr static const char* g_module_names[engine_api::count]{
+constexpr static const char* g_ModuleNames[EngineAPI::Count]{
     "Iron.Windowing.dll",
     "Iron.Renderer.dll",
     "Iron.Input.dll",
@@ -13,165 +13,160 @@ constexpr static const char* g_module_names[engine_api::count]{
 };
 
 std::filesystem::path
-get_exe_path()
+GetExePath()
 {
-    char path[MAX_PATH];
-    const u32 length{ GetModuleFileNameA(0, &path[0], MAX_PATH) };
-    if (!length || GetLastError() == ERROR_INSUFFICIENT_BUFFER) return {};
-    return std::filesystem::path(path).remove_filename();
+    char Path[MAX_PATH];
+    const u32 Length{ GetModuleFileNameA(0, &Path[0], MAX_PATH) };
+    if (!Length || GetLastError() == ERROR_INSUFFICIENT_BUFFER) return {};
+    return std::filesystem::path(Path).remove_filename();
 }
-}//anonymous nameapce
+} // anonymous namespace
 
-engine_context g_context{};
+EngineContext g_Context{};
 
-engine_context::engine_context()
-    : m_log_enable_debug(true),
-    m_log_enable_info(true),
-    m_log_enable_warning(true),
-    m_log_enable_error(true),
-    m_log_enable_fatal(true),
-    m_log_enable_filename(true),
-    m_headless(true),
-    m_running(false) {
-    m_engine_dir = get_exe_path();
+EngineContext::EngineContext()
+    : m_LogEnableDebug(true),
+    m_LogEnableInfo(true),
+    m_LogEnableWarning(true),
+    m_LogEnableError(true),
+    m_LogEnableFatal(true),
+    m_LogEnableFilename(true),
+    m_Headless(true),
+    m_Running(false)
+{
+    m_EngineDir = GetExePath();
 
-    std::filesystem::path config_path{ "D:\\code\\IronEngine\\" };
-    config_path.append("settings.ini");
-    config_file config{};
-    if (result::success(config.load(config_path.string().c_str()))) {
-        m_log_enable_debug = atoi(config.get("engine.log", "enable_debug", "1"));
-        m_log_enable_info = atoi(config.get("engine.log", "enable_info", "1"));
-        m_log_enable_warning = atoi(config.get("engine.log", "enable_warning", "1"));
-        m_log_enable_error = atoi(config.get("engine.log", "enable_error", "1"));
-        m_log_enable_fatal = atoi(config.get("engine.log", "enable_fatal", "1"));
-        m_log_enable_filename = atoi(config.get("engine.log", "enable_filename", "1"));
+    std::filesystem::path ConfigPath{ "D:\\code\\IronEngine\\" };
+    ConfigPath.append("settings.ini");
+    ConfigFile Config{};
+    if (Result::Success(Config.Load(ConfigPath.string().c_str()))) {
+        m_LogEnableDebug = atoi(Config.Get("engine.log", "enable_debug", "1"));
+        m_LogEnableInfo = atoi(Config.Get("engine.log", "enable_info", "1"));
+        m_LogEnableWarning = atoi(Config.Get("engine.log", "enable_warning", "1"));
+        m_LogEnableError = atoi(Config.Get("engine.log", "enable_error", "1"));
+        m_LogEnableFatal = atoi(Config.Get("engine.log", "enable_fatal", "1"));
+        m_LogEnableFilename = atoi(Config.Get("engine.log", "enable_filename", "1"));
     }
 
-    enable_log_level(log_level::debug, m_log_enable_debug ? option::enable : option::disable);
-    enable_log_level(log_level::info, m_log_enable_info ? option::enable : option::disable);
-    enable_log_level(log_level::warning, m_log_enable_warning ? option::enable : option::disable);
-    enable_log_level(log_level::error, m_log_enable_error ? option::enable : option::disable);
-    enable_log_level(log_level::fatal, m_log_enable_fatal ? option::enable : option::disable);
-    enable_log_include_path(m_log_enable_filename ? option::enable : option::disable);
+    EnableLogLevel(LogLevel::Debug, m_LogEnableDebug ? Option::Enable : Option::Disable);
+    EnableLogLevel(LogLevel::Info, m_LogEnableInfo ? Option::Enable : Option::Disable);
+    EnableLogLevel(LogLevel::Warning, m_LogEnableWarning ? Option::Enable : Option::Disable);
+    EnableLogLevel(LogLevel::Error, m_LogEnableError ? Option::Enable : Option::Disable);
+    EnableLogLevel(LogLevel::Fatal, m_LogEnableFatal ? Option::Enable : Option::Disable);
+    EnableLogIncludePath(m_LogEnableFilename ? Option::Enable : Option::Disable);
 }
 
-engine_context::~engine_context() {
-    std::filesystem::path config_path{ "D:\\code\\IronEngine\\" };
-    config_path.append("settings.ini");
-    config_file config{};
-    config.set("engine.log", "enable_debug", std::to_string(m_log_enable_debug).c_str());
-    config.set("engine.log", "enable_info", std::to_string(m_log_enable_info).c_str());
-    config.set("engine.log", "enable_warning", std::to_string(m_log_enable_warning).c_str());
-    config.set("engine.log", "enable_error", std::to_string(m_log_enable_error).c_str());
-    config.set("engine.log", "enable_fatal", std::to_string(m_log_enable_fatal).c_str());
-    config.set("engine.log", "enable_filename", std::to_string(m_log_enable_filename).c_str());
+EngineContext::~EngineContext() {
+    std::filesystem::path ConfigPath{ "D:\\code\\IronEngine\\" };
+    ConfigPath.append("settings.ini");
+    ConfigFile Config{};
+    Config.Set("engine.log", "enable_debug", std::to_string(m_LogEnableDebug).c_str());
+    Config.Set("engine.log", "enable_info", std::to_string(m_LogEnableInfo).c_str());
+    Config.Set("engine.log", "enable_warning", std::to_string(m_LogEnableWarning).c_str());
+    Config.Set("engine.log", "enable_error", std::to_string(m_LogEnableError).c_str());
+    Config.Set("engine.log", "enable_fatal", std::to_string(m_LogEnableFatal).c_str());
+    Config.Set("engine.log", "enable_filename", std::to_string(m_LogEnableFilename).c_str());
 
-    if (result::fail(config.save(config_path.string().c_str()))) {
+    if (Result::Fail(Config.Save(ConfigPath.string().c_str()))) {
         LOG_ERROR("Failed to save engine config settings!");
     }
 
-    reset();
+    Reset();
 }
 
-result::code
-engine_context::run(const engine_init_info& info, application* const app)
+Result::Code
+EngineContext::Run(const EngineInitInfo& Info, Application* const App)
 {
-    m_init_info = info;
-    m_headless = option::get(info.headless);
+    m_InitInfo = Info;
+    m_Headless = Option::Get(Info.Headless);
 
-    if (!app) {
+    if (!App) {
         LOG_FATAL("No application interface!");
-        return result::e_nointerface;
+        return Result::ENointerface;
     }
 
-    result::code res{ result::ok };
+    Result::Code Res{ Result::Ok };
 
-    if (!m_headless) {
-        m_windowing = {
-            (window::vtable_windowing*)load_and_get_vtable(
-                g_module_names[engine_api::windowing],
-                sizeof(window::vtable_windowing)
-            )
+    if (!m_Headless) {
+        m_WindowFactory = {
+            (Window::IWindowFactory*)LoadAndGetFactory(
+                g_ModuleNames[EngineAPI::Windowing])
         };
-
-        m_windowing.set_default_background({ 0.1f, 0.2f, 0.4f });
-        m_windowing.set_default_titlebar({ 0.2f, 0.2f, 0.2f });
-        m_windowing.set_icon("D:\\code\\IronEngine\\iron.ico", { 32, 32 });
-
-        res = app->pre_initialize();
-        if (result::fail(res)) {
-            app->shutdown();
-            return res;
+        
+        Res = App->PreInitialize();
+        if (Result::Fail(Res)) {
+            App->Shutdown();
+            return Res;
         }
 
-        window::window_init_info window_info{};
-        window_info.width = info.window.width;
-        window_info.height = info.window.height;
-        window_info.title = info.window.title;
-        window_info.fullscreen = info.window.fullscreen;
+        Window::WindowInitInfo WindowInfo{};
+        WindowInfo.Width = Info.Window.Width;
+        WindowInfo.Height = Info.Window.Height;
+        WindowInfo.Title = Info.Window.Title;
+        WindowInfo.Fullscreen = Info.Window.Fullscreen;
 
-        res = m_windowing.create_window(window_info, &m_window);
-        if (result::fail(res)) {
-            LOG_FATAL("A window was requested, but could not be made!");
-            return res;
+        Res = m_WindowFactory->OpenWindow(WindowInfo, &m_MainWindow);
+        if (Result::Fail(Res)) {
+            LOG_FATAL("A window was requested, but could not be opened!");
+            return Res;
+        }
+
+        m_MainWindow->SetIcon("D:\\code\\IronEngine\\iron.ico", { 32, 32 });
+        m_MainWindow->SetBorderColor({ 0.2f, 0.2f, 0.2f });
+        m_MainWindow->SetTitleColor({ 0.9f, 0.9f, 1.f });
+    }
+
+    Res = App->PostInitialize();
+    if (Result::Fail(Res)) {
+        App->Shutdown();
+        return Res;
+    }
+
+    m_Running = true;
+
+    while (m_Running.load()) {
+        App->Frame();
+
+        m_MainWindow->PumpMessages();
+        if (!m_MainWindow->IsOpen()) {
+            m_Running = false;
         }
     }
 
-    res = app->post_initialize();
-    if (result::fail(res)) {
-        app->shutdown();
-        return res;
+    App->Shutdown();
+
+    if (!m_Headless) {
+        SafeRelease(m_MainWindow);
     }
 
-    m_running = true;
-
-    while (m_running.load()) {
-        app->frame();
-
-        m_windowing.poll_messages(m_window);
-        if (!m_windowing.is_window_open(m_window)) {
-            m_running = false;
-        }
-    }
-
-    app->shutdown();
-
-    if (!m_headless) {
-        m_windowing.destroy_window(m_window);
-        m_windowing.destroy();
-    }
-
-    return result::ok;
+    return Result::Ok;
 }
 
-void*
-engine_context::load_and_get_vtable(const char* dllName, u64 buffer_size) {
-    std::filesystem::path full_path{ m_engine_dir };
-    full_path.append(dllName);
-    const u64 id{ fnv1a(dllName) };
-    const result::code res{ m_modules.load_module(full_path.string().c_str(), id, buffer_size) };
-    if (result::fail(res)) {
-        LOG_RESULT(res);
+IObjectBase* const
+EngineContext::LoadAndGetFactory(const char* DllName)
+{
+    std::filesystem::path FullPath{ m_EngineDir };
+    FullPath.append(DllName);
+    const u64 Id{ Fnv1A(DllName) };
+    const Result::Code Res{ m_Modules.LoadModule(FullPath.string().c_str(), Id) };
+    if (Result::Fail(Res)) {
+        LOG_RESULT(Res);
         return nullptr;
     }
 
-    return m_modules.get_vtable(id);
+    return m_Modules.GetFactory(Id);
 }
 
-void* const
-engine_context::get_engine_api(engine_api::api api) {
-    switch (api)
+IObjectBase* const
+EngineContext::GetEngineAPI(EngineAPI::Api Api) {
+    switch (Api)
     {
-    case engine_api::windowing:
-        return &m_windowing;
-    case engine_api::renderer:
-        break;
-    case engine_api::input:
-        break;
-    case engine_api::audio:
-        break;
-    case engine_api::filesystem:
-        break;
+    case EngineAPI::Windowing:
+        return m_WindowFactory;
+    case EngineAPI::Renderer:
+    case EngineAPI::Input:
+    case EngineAPI::Audio:
+    case EngineAPI::Filesystem:
     default:
         break;
     }
@@ -180,25 +175,20 @@ engine_context::get_engine_api(engine_api::api api) {
 }
 
 void
-engine_context::parse_command_args(s32 argc, char** argv) {
-    for (s32 i{ 0 }; i < argc; ++i) {
-        LOG_INFO("Parsed command argument %s", argv[i]);
-        m_cmd_args.emplace_back(argv[i]);
+EngineContext::ParseCommandArgs(s32 ArgC, char** ArgV) {
+    for (s32 I{ 0 }; I < ArgC; ++I) {
+        LOG_INFO("Parsed command argument %s", ArgV[I]);
+        m_CmdArgs.emplace_back(ArgV[I]);
     }
 }
 
 void
-engine_context::reset() {
-    if (!m_headless) {
-        if (module_state::is_valid(m_windowing.get_state())) m_windowing.destroy();
-
+EngineContext::Reset() {
+    for (u32 I{ 0 }; I < EngineAPI::Count; ++I) {
+        m_Modules.UnloadModule(Fnv1A(g_ModuleNames[I]));
     }
 
-    for (u32 i{ 0 }; i < engine_api::count; ++i) {
-        m_modules.unload_module(fnv1a(g_module_names[i]));
-    }
-
-    m_modules.reset();
-    m_cmd_args = {};
+    m_Modules.Reset();
+    m_CmdArgs = {};
 }
 }

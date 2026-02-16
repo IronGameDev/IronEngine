@@ -7,102 +7,91 @@
 #define ENGINE_API __declspec(dllimport)
 #endif
 
-namespace iron {
-typedef u64 module_id;
+namespace Iron {
 
-struct engine_api {
-    enum api : u32 {
-        windowing = 0,
-        renderer,
-        input,
-        audio,
-        filesystem,
-        count
+typedef u64 ModuleId;
+
+struct EngineAPI {
+    enum Api : u32 {
+        Windowing = 0,
+        Renderer,
+        Input,
+        Audio,
+        Filesystem,
+        Count
     };
 };
 
-struct engine_init_info {
-    const char*         app_name;
-    version             app_version;
-    s32                 argc;
-    char**              argv;
-    option::value       headless;
+struct EngineInitInfo {
+    const char*     AppName;
+    Version         AppVersion;
+    s32             ArgC;
+    char**          ArgV;
+    Option::Value   Headless;
 
     struct {
-        u32             width{ 1024 };
-        u32             height{ 768 };
-        const char*     title{ "Iron Game" };
-        option::value   fullscreen{ false };
-    } window;
+        u32             Width{ 1024 };
+        u32             Height{ 768 };
+        const char*     Title{ "Iron Game" };
+        Option::Value   Fullscreen{ false };
+    } Window;
 };
 
-struct engine_module {
-    u64             id;
-    void*           vtable;
-    void*           library;
+struct EngineModule {
+    u64             Id;
+    void*           Library;
+    IObjectBase*    Factory;
 
-    constexpr static inline u64 hash(const char* name) noexcept {
-        u64 hash{ 0x468a3276cf9809ed };
+    constexpr static inline u64 Hash(const char* Name) noexcept {
+        u64 Hash{ 0x468a3276cf9809ed };
 
-        while (*name != '\0') {
-            hash ^= (u64)*name + 0x83987239870acefd;
-            ++name;
+        while (*Name != '\0') {
+            Hash ^= (u64)*Name + 0x83987239870acefd;
+            ++Name;
         }
 
-        return hash;
+        return Hash;
     }
 
-    constexpr static inline bool is_valid(const engine_module& m) {
-        return m.library && m.vtable;
+    constexpr static inline bool IsValid(const EngineModule& M) {
+        return M.Library && M.Factory;
     }
 
-    constexpr static inline bool is_loaded(const engine_module& m) {
-        return m.library;
+    constexpr static inline bool IsLoaded(const EngineModule& M) {
+        return M.Library;
     }
 };
 
-class application {
+class Application {
 public:
-    virtual ~application() = default;
+    virtual ~Application() = default;
 
-    //Before window / renderer creation
-    //Will only run in non-headless mode
-    virtual result::code pre_initialize() = 0;
-    
-    //After window / renderer creation
-    //Should be used with headless mode
-    virtual result::code post_initialize() = 0;
-    
-    virtual void frame() = 0;
-    virtual void shutdown() = 0;
+    // Before window / renderer creation
+    // Will only run in non-headless mode
+    virtual Result::Code PreInitialize() = 0;
+
+    // After window / renderer creation
+    // Should be used with headless mode
+    virtual Result::Code PostInitialize() = 0;
+
+    virtual void Frame() = 0;
+    virtual void Shutdown() = 0;
 };
 
-/// <summary>
 /// Starts and runs the engine
-/// </summary>
-/// <param name="init_info"></param>
-/// <param name="app"></param>
-/// <returns></returns>
-ENGINE_API result::code run_engine(const engine_init_info& init_info, application* app);
+ENGINE_API Result::Code RunEngine(const EngineInitInfo& InitInfo, Application* App);
 
-/// <summary>
 /// This is how the user notifies the engine to stop running
-/// </summary>
-/// <returns></returns>
-ENGINE_API void request_quit();
+ENGINE_API void RequestQuit();
 
-/// <summary>
 /// Get an engine module
 /// NEVER call destroy on these factories, this will cause UB
-/// </summary>
-/// <param name="api">Requested API</param>
-/// <returns>initialized factory_module*</returns>
-ENGINE_API void* const get_engine_api(engine_api::api api);
+ENGINE_API void* const GetEngineAPI(EngineAPI::Api Api);
 
 ////User Plugins???
-//ENGINE_API result::code load_module(const char* path, engine_module* handle);
-//ENGINE_API void unload_module(engine_module handle);
+//ENGINE_API Result::Code LoadModule(const char* Path, EngineModule* Handle);
+//ENGINE_API void UnloadModule(EngineModule Handle);
 
-//Deprecated!
-ENGINE_API version get_app_version();
+// Deprecated!
+ENGINE_API Version GetAppVersion();
 }

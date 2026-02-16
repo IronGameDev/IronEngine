@@ -2,9 +2,9 @@
 
 #include <math.h>
 
-namespace iron::math {
+namespace Iron::Math {
 f32
-sqrt_f(f32 value) {
+SqrtF(f32 value) {
     return sqrtf(value);
 }
 }

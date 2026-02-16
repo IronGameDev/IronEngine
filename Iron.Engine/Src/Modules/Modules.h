@@ -4,19 +4,20 @@
 #include <unordered_map>
 #include <string>
 
-namespace iron {
-class module_manager {
+namespace Iron {
+
+class ModuleManager {
 public:
-    ~module_manager();
+    ~ModuleManager();
 
-    result::code load_module(const char* path, u64 id, u64 buffer_size);
-    void unload_module(u64 id);
+    Result::Code LoadModule(const char* Path, u64 Id);
+    void UnloadModule(u64 Id);
 
-    void* const get_vtable(u64 id) const;
+    IObjectBase* const GetFactory(u64 Id) const;
 
-    void reset();
+    void Reset();
 
 private:
-    std::unordered_map<u64, engine_module>  m_modules{};
+    std::unordered_map<u64, EngineModule> m_Modules{};
 };
 }

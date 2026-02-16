@@ -4,34 +4,41 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-namespace iron {
+namespace Iron {
 namespace {
-bool                    g_enabled_levels[log_level::count]{};
-bool                    g_include_file{ true };
-std::mutex              g_log_mutex{};
+bool        g_EnabledLevels[LogLevel::Count]{};
+bool        g_IncludeFile{ true };
+std::mutex  g_LogMutex{};
 
-constexpr static const char*    g_errrors[result::count] {
-    "Success",
-    "e_nomemory",
-    "e_nullptr",
-    "e_invalidarg",
-    "e_incomplete",
-    "e_createwindow",
-    "e_loadlibrary",
-    "e_getvtable"
+constexpr static const char* g_Errors[Result::Count]{
+    "Ok",
+    "ENomemory",
+    "ENullptr",
+    "EInvalidarg",
+    "EIncomplete",
+    "ECreatewindow",
+    "ELoadlibrary",
+    "EGetvtable",
+    "ESizemismatch",
+    "ELoadfile",
+    "EWritefile",
+    "ENointerface",
+    "ELoadIcon",
 };
-}//anonymous namespace
+
+} // anonymous namespace
+
 
 void
-log(log_level::level level, const char* file, int line, const char* msg, ...) {
-    std::lock_guard lock{ g_log_mutex };
+Log(LogLevel::Level Level, const char* File, int Line, const char* Msg, ...) {
+    std::lock_guard Lock{ g_LogMutex };
 
-    if (level >= log_level::count
-        || !g_enabled_levels[level]) {
+    if (Level >= LogLevel::Count
+        || !g_EnabledLevels[Level]) {
         return;
     }
 
-    constexpr static const char* level_text[]{
+    constexpr static const char* LevelText[]{
         "\x1b[36m[DEBUG]\x1b[0m",
         "\x1b[37m[INFO]\x1b[0m",
         "\x1b[33m[WARNING]\x1b[0m",
@@ -39,51 +46,51 @@ log(log_level::level level, const char* file, int line, const char* msg, ...) {
         "\x1b[34m[FATAL]\x1b[0m"
     };
 
-    static_assert(_countof(level_text) == log_level::count, "Level text array size mismatch");
+    static_assert(_countof(LevelText) == LogLevel::Count, "Level text array size mismatch");
 
-    va_list args;
-    va_start(args, msg);
+    va_list Args;
+    va_start(Args, Msg);
 
-    if (g_include_file) {
-        printf("%s %s:%i ", level_text[(u32)level], file, line);
+    if (g_IncludeFile) {
+        printf("%s %s:%i ", LevelText[(u32)Level], File, Line);
     }
     else {
-        printf("%s ", level_text[(u32)level]);
+        printf("%s ", LevelText[(u32)Level]);
     }
-    
-    vprintf(msg, args);
+
+    vprintf(Msg, Args);
     printf("\n");
 
-    va_end(args);
+    va_end(Args);
 }
 
 void
-enable_log_level(log_level::level level, option::value enable) {
-    if (level >= log_level::count) {
+EnableLogLevel(LogLevel::Level Level, Option::Value Enable) {
+    if (Level >= LogLevel::Count) {
         return;
     }
 
-    std::lock_guard lock{ g_log_mutex };
-    g_enabled_levels[level] = option::get(enable);
+    std::lock_guard Lock{ g_LogMutex };
+    g_EnabledLevels[Level] = Option::Get(Enable);
 }
 
 void
-enable_log_include_path(option::value enable) {
-    std::lock_guard lock{ g_log_mutex };
-    g_include_file = option::get(enable);
+EnableLogIncludePath(Option::Value Enable) {
+    std::lock_guard Lock{ g_LogMutex };
+    g_IncludeFile = Option::Get(Enable);
 }
 
 void
-log_error(result::code code, const char* file, int line)
+LogError(Result::Code Code, const char* File, int Line)
 {
-    if (code > result::count)
+    if (Code > Result::Count)
         return;
 
-    if (code == result::ok) {
-        log(log_level::info, file, line, g_errrors[code]);
+    if (Code == Result::Ok) {
+        Log(LogLevel::Info, File, Line, g_Errors[Code]);
     }
     else {
-        log(log_level::error, file, line, g_errrors[code]);
+        Log(LogLevel::Error, File, Line, g_Errors[Code]);
     }
 }
 }

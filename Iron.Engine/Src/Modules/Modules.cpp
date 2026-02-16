@@ -3,86 +3,83 @@
 #include <Windows.h>
 #include "Modules.h"
 
-namespace iron {
-typedef result::code(*func_get_vtable)(void*, u64);
+namespace Iron {
+typedef Result::Code(*FuncGetVTable)(IObjectBase**);
 
-module_manager::~module_manager() {
-    reset();
+ModuleManager::~ModuleManager() {
+    Reset();
 }
 
-result::code
-module_manager::load_module(const char* path, u64 id, u64 buffer_size) {
-    auto pair{ m_modules.find(id) };
-    if (pair != m_modules.end()) {
-        return result::ok;
+Result::Code
+ModuleManager::LoadModule(const char* Path, u64 Id) {
+    auto Pair{ m_Modules.find(Id) };
+    if (Pair != m_Modules.end()) {
+        return Result::Ok;
     }
 
-    engine_module mod{};
-    mod.id = id;
-    mod.library = LoadLibraryExA(path, 0, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
-    if (!mod.library) {
-        return result::e_loadlibrary;
+    EngineModule Mod{};
+    Mod.Id = Id;
+    Mod.Library = LoadLibraryExA(Path, 0, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+    if (!Mod.Library) {
+        return Result::ELoadlibrary;
     }
 
-    func_get_vtable func{ (func_get_vtable)GetProcAddress((HMODULE)mod.library, "get_vtable") };
-    if (!func) {
-        FreeLibrary((HMODULE)mod.library);
-        return result::e_getvtable;
+    FuncGetVTable Func{ (FuncGetVTable)GetProcAddress((HMODULE)Mod.Library, "GetFactory") };
+    if (!Func) {
+        FreeLibrary((HMODULE)Mod.Library);
+        return Result::EGetvtable;
     }
 
-    mod.vtable = mem_alloc(buffer_size);
-
-    result::code res{ result::ok };
-    res = func(mod.vtable, buffer_size);
-    if (result::fail(res)) {
-        mem_free(mod.vtable);
-        FreeLibrary((HMODULE)mod.library);
-        return res;
+    Result::Code Res{ Result::Ok };
+    Res = Func(&Mod.Factory);
+    if (Result::Fail(Res)) {
+        FreeLibrary((HMODULE)Mod.Library);
+        return Res;
     }
-    
-    LOG_INFO("Loaded module %s Id=%ull", path, id);
-    m_modules[id] = mod;
 
-    return res;
+    LOG_INFO("Loaded module %s Id=%ull", Path, Id);
+    m_Modules[Id] = Mod;
+
+    return Res;
 }
 
-void module_manager::unload_module(u64 id) {
-    auto it{ m_modules.find(id) };
-    if (it == m_modules.end())
+void ModuleManager::UnloadModule(u64 Id) {
+    auto It{ m_Modules.find(Id) };
+    if (It == m_Modules.end())
         return;
 
-    engine_module& mod{ it->second };
-    if (engine_module::is_loaded(mod)) {
-        FreeLibrary((HMODULE)mod.library);
-        mem_free(mod.vtable);
+    EngineModule& Mod{ It->second };
+    if (EngineModule::IsLoaded(Mod)) {
+        SafeRelease(Mod.Factory);
+        FreeLibrary((HMODULE)Mod.Library);
     }
 
-    m_modules.erase(it);
+    m_Modules.erase(It);
 }
 
-void* const
-module_manager::get_vtable(u64 id) const {
-    auto pair{ m_modules.find(id) };
-    if (pair != m_modules.end()) {
-        return pair->second.vtable;
+IObjectBase* const
+ModuleManager::GetFactory(u64 Id) const
+{
+    auto Pair{ m_Modules.find(Id) };
+    if (Pair != m_Modules.end()) {
+        return Pair->second.Factory;
     }
 
     return nullptr;
 }
 
 void
-module_manager::reset() {
-    for (auto it{ m_modules.begin() }; it != m_modules.end(); ) {
-        if (engine_module::is_loaded(it->second)) {
-            LOG_WARNING("Dll Id=%ull was not unloaded!", it->second.id);
+ModuleManager::Reset() {
+    for (auto It{ m_Modules.begin() }; It != m_Modules.end(); ) {
+        if (EngineModule::IsLoaded(It->second)) {
+            LOG_WARNING("Dll Id=%ull was not unloaded!", It->second.Id);
+            SafeRelease(It->second.Factory);
+            FreeLibrary((HMODULE)It->second.Library);
 
-            FreeLibrary((HMODULE)it->second.library);
-            mem_free(it->second.vtable);
-
-            it = m_modules.erase(it);
+            It = m_Modules.erase(It);
         }
         else {
-            ++it;
+            ++It;
         }
     }
 }

@@ -2,30 +2,29 @@
 
 #include <memory>
 
-namespace iron {
+namespace Iron {
 void*
-mem_alloc(size_t size) {
-    return malloc(size);
+MemAlloc(size_t Size) {
+    return malloc(Size);
 }
 
 void
-mem_free(void* block) {
-    return free(block);
+MemFree(void* Block) {
+    free(Block);
 }
 
 void
-mem_set(void* dst, u8 value, size_t size) {
-    memset(dst, (int)value, size);
+MemSet(void* Dst, u8 Value, size_t Size) {
+    memset(Dst, (int)Value, Size);
 }
 
 void
-mem_copy(void* dst, const void* src, size_t size) {
-    memcpy(dst, src, size);
+MemCopy(void* Dst, const void* Src, size_t Size) {
+    memcpy(Dst, Src, Size);
 }
 
 void
-mem_copy_s(void* dst, const void* src, size_t dst_size, size_t src_size)
-{
-    memcpy_s(dst, dst_size, src, src_size);
+MemCopyS(void* Dst, const void* Src, size_t DstSize, size_t SrcSize) {
+    memcpy_s(Dst, DstSize, Src, SrcSize);
 }
 }

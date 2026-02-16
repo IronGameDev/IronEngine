@@ -142,12 +142,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Src\dllmain.cpp" />
-    <ClCompile Include="Src\Window.cpp" />
     <ClCompile Include="Src\Windowing.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Src\ModuleState.h" />
-    <ClInclude Include="Src\Window.h" />
     <ClInclude Include="Windowing.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
