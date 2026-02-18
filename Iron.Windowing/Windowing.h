@@ -8,7 +8,6 @@ struct WindowInitInfo {
     u32             Width;
     u32             Height;
     const char*     Title;
-    bool            Fullscreen;
 };
 
 class IWindow;

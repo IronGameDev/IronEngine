@@ -31,7 +31,6 @@ private:
 };
 
 //TODO: Add compute backend for headless
-//TODO: Allow user to costumize windows
 
 int main(int argc, char** argv) {
     EngineInitInfo engine_info{};
@@ -41,7 +40,8 @@ int main(int argc, char** argv) {
     engine_info.AppVersion.Patch = 948;
     engine_info.ArgC = argc;
     engine_info.ArgV = argv;
-    engine_info.Headless = Option::Disable;
+    engine_info.Headless = false;
+    engine_info.Window.Fullscreen = false;
 
     Editor instance{};
 

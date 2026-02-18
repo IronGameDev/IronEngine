@@ -132,7 +132,7 @@ WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 }
 
 CWindow::CWindow(const WindowInitInfo& initInfo)
-    : m_Fullscreen(initInfo.Fullscreen), m_Open(false),
+    : m_Fullscreen(false), m_Open(false),
     m_Background(RGB(24, 48, 87)),
     m_NormalRect() {
 

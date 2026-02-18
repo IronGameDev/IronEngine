@@ -6,7 +6,7 @@ namespace Iron {
 namespace {
 constexpr static const char* g_ModuleNames[EngineAPI::Count]{
     "Iron.Windowing.dll",
-    "Iron.Renderer.dll",
+    "Iron.RHI.dll",
     "Iron.Input.dll",
     "Iron.Audio.dll",
     "Iron.Filesystem.dll"
@@ -48,12 +48,12 @@ EngineContext::EngineContext()
         m_LogEnableFilename = atoi(Config.Get("engine.log", "enable_filename", "1"));
     }
 
-    EnableLogLevel(LogLevel::Debug, m_LogEnableDebug ? Option::Enable : Option::Disable);
-    EnableLogLevel(LogLevel::Info, m_LogEnableInfo ? Option::Enable : Option::Disable);
-    EnableLogLevel(LogLevel::Warning, m_LogEnableWarning ? Option::Enable : Option::Disable);
-    EnableLogLevel(LogLevel::Error, m_LogEnableError ? Option::Enable : Option::Disable);
-    EnableLogLevel(LogLevel::Fatal, m_LogEnableFatal ? Option::Enable : Option::Disable);
-    EnableLogIncludePath(m_LogEnableFilename ? Option::Enable : Option::Disable);
+    EnableLogLevel(LogLevel::Debug, m_LogEnableDebug);
+    EnableLogLevel(LogLevel::Info, m_LogEnableInfo);
+    EnableLogLevel(LogLevel::Warning, m_LogEnableWarning);
+    EnableLogLevel(LogLevel::Error, m_LogEnableError);
+    EnableLogLevel(LogLevel::Fatal, m_LogEnableFatal);
+    EnableLogIncludePath(m_LogEnableFilename);
 }
 
 EngineContext::~EngineContext() {
@@ -78,7 +78,7 @@ Result::Code
 EngineContext::Run(const EngineInitInfo& Info, Application* const App)
 {
     m_InitInfo = Info;
-    m_Headless = Option::Get(Info.Headless);
+    m_Headless = Info.Headless;
 
     if (!App) {
         LOG_FATAL("No application interface!");
@@ -102,8 +102,7 @@ EngineContext::Run(const EngineInitInfo& Info, Application* const App)
         Window::WindowInitInfo WindowInfo{};
         WindowInfo.Width = Info.Window.Width;
         WindowInfo.Height = Info.Window.Height;
-        WindowInfo.Title = Info.Window.Title;
-        WindowInfo.Fullscreen = Info.Window.Fullscreen;
+        WindowInfo.Title = Info.AppName;
 
         Res = m_WindowFactory->OpenWindow(WindowInfo, &m_MainWindow);
         if (Result::Fail(Res)) {
@@ -114,6 +113,7 @@ EngineContext::Run(const EngineInitInfo& Info, Application* const App)
         m_MainWindow->SetIcon("D:\\code\\IronEngine\\iron.ico", { 32, 32 });
         m_MainWindow->SetBorderColor({ 0.2f, 0.2f, 0.2f });
         m_MainWindow->SetTitleColor({ 0.9f, 0.9f, 1.f });
+        m_MainWindow->SetFullscreen(Info.Window.Fullscreen);
     }
 
     Res = App->PostInitialize();

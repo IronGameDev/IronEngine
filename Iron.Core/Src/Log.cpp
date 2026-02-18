@@ -65,19 +65,19 @@ Log(LogLevel::Level Level, const char* File, int Line, const char* Msg, ...) {
 }
 
 void
-EnableLogLevel(LogLevel::Level Level, Option::Value Enable) {
+EnableLogLevel(LogLevel::Level Level, bool Enable) {
     if (Level >= LogLevel::Count) {
         return;
     }
 
     std::lock_guard Lock{ g_LogMutex };
-    g_EnabledLevels[Level] = Option::Get(Enable);
+    g_EnabledLevels[Level] = Enable;
 }
 
 void
-EnableLogIncludePath(Option::Value Enable) {
+EnableLogIncludePath(bool  Enable) {
     std::lock_guard Lock{ g_LogMutex };
-    g_IncludeFile = Option::Get(Enable);
+    g_IncludeFile = Enable;
 }
 
 void

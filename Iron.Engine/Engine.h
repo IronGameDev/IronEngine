@@ -27,13 +27,12 @@ struct EngineInitInfo {
     Version         AppVersion;
     s32             ArgC;
     char**          ArgV;
-    Option::Value   Headless;
+    bool            Headless;
 
     struct {
         u32             Width{ 1024 };
         u32             Height{ 768 };
-        const char*     Title{ "Iron Game" };
-        Option::Value   Fullscreen{ false };
+        bool            Fullscreen{ false };
     } Window;
 };
 

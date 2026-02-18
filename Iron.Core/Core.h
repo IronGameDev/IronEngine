@@ -24,17 +24,6 @@ typedef float f32;
 
 typedef u32 TypeId;
 
-struct Option {
-    enum Value : u8 {
-        Disable = 0,
-        Enable = 1,
-    };
-
-    constexpr static inline bool Get(Value V) {
-        return V == Enable;
-    }
-};
-
 struct Version {
     u32 Major : 11;
     u32 Minor : 11;
@@ -202,8 +191,8 @@ CORE_API void MemCopy(void* Dst, const void* Src, size_t Size);
 CORE_API void MemCopyS(void* Dst, const void* Src, size_t DstSize, size_t SrcSize);
 
 CORE_API void Log(LogLevel::Level Level, const char* File, int Line, const char* Msg, ...);
-CORE_API void EnableLogLevel(LogLevel::Level Level, Option::Value Enable);
-CORE_API void EnableLogIncludePath(Option::Value Enable);
+CORE_API void EnableLogLevel(LogLevel::Level Level, bool Enable);
+CORE_API void EnableLogIncludePath(bool Enable);
 CORE_API void LogError(Result::Code Code, const char* File, int Line);
 
 class IObjectBase {
