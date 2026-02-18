@@ -1,6 +1,8 @@
 #pragma once
 #include <Iron.Core/Core.h>
 
+#define RHI_MAX_NAME 128
+
 namespace Iron::RHI {
 typedef u32 FGResource;
 
@@ -47,6 +49,10 @@ class IRHIAdapter : public IObjectBase {
 public:
     virtual ~IRHIAdapter() = default;
 
+    virtual const char* GetName() const = 0;
+    virtual AdapterType::Type GetType() const = 0;
+    virtual u32 GetVendorID() const = 0;
+    virtual u32 GetDeviceID() const = 0;
     virtual void* const GetNative() const = 0;
 };
 

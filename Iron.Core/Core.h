@@ -424,6 +424,16 @@ constexpr f32 ConstexprRsqrt(f32 X) noexcept {
     return Y;
 }
 
+template<typename T>
+constexpr inline T Min(T x, T y) {
+    return x < y ? x : y;
+}
+
+template<typename T>
+constexpr inline T Max(T x, T y) {
+    return x > y ? x : y;
+}
+
 template <typename V, int N>
 struct VecBase;
 

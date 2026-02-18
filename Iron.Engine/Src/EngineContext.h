@@ -2,6 +2,7 @@
 #include <Iron.Engine/Engine.h>
 #include <Iron.Engine/Src/Modules/Modules.h>
 #include <Iron.Windowing/Windowing.h>
+#include <Iron.RHI/Renderer.h>
 
 #include <filesystem>
 
@@ -23,6 +24,8 @@ public:
 
     Window::IWindowFactory*     m_WindowFactory{};
     Window::IWindow*            m_MainWindow{};
+
+    RHI::IRHIFactory*           m_RHIFactory{};
 
     std::atomic<bool>           m_Running{};
 

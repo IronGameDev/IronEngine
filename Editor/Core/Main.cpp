@@ -1,6 +1,7 @@
 #include <Iron.Core/Core.h>
 #include <Iron.Engine/Engine.h>
 #include <Iron.Windowing/Windowing.h>
+#include <Iron.RHI/Renderer.h>
 
 #pragma comment(lib, "iron.core.lib")
 #pragma comment(lib, "iron.engine.lib")
@@ -13,6 +14,12 @@ public:
     ~Editor() override = default;
 
     Result::Code PreInitialize() override {
+        using namespace RHI;
+        IRHIFactory* const factory{ (IRHIFactory* const)GetEngineAPI(EngineAPI::Renderer) };
+
+        IRHIAdapter* adapters[2]{};
+        factory->GetAdapters(&adapters[0], 2);
+
         return Result::Code::Ok;
     }
 

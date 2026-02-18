@@ -88,11 +88,11 @@ EngineContext::Run(const EngineInitInfo& Info, Application* const App)
     Result::Code Res{ Result::Ok };
 
     if (!m_Headless) {
-        m_WindowFactory = {
-            (Window::IWindowFactory*)LoadAndGetFactory(
-                g_ModuleNames[EngineAPI::Windowing])
-        };
-        
+        m_WindowFactory = (Window::IWindowFactory*)LoadAndGetFactory(
+            g_ModuleNames[EngineAPI::Windowing]);
+        m_RHIFactory = (RHI::IRHIFactory*)LoadAndGetFactory(
+            g_ModuleNames[EngineAPI::Renderer]);
+
         Res = App->PreInitialize();
         if (Result::Fail(Res)) {
             App->Shutdown();
@@ -174,6 +174,7 @@ EngineContext::GetEngineAPI(EngineAPI::Api Api) {
     case EngineAPI::Windowing:
         return m_WindowFactory;
     case EngineAPI::Renderer:
+        return m_RHIFactory;
     case EngineAPI::Input:
     case EngineAPI::Audio:
     case EngineAPI::Filesystem:
