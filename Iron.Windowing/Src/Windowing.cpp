@@ -18,7 +18,6 @@ struct WindowHint {
 class CWindow final : public IWindow {
 public:
     explicit CWindow(
-        CWindowFactory* factory,
         const WindowInitInfo& initInfo);
 
     ~CWindow() = default;
@@ -41,6 +40,9 @@ public:
     Result::Code SetIcon(
         const char* path,
         Math::V2 size) override;
+
+    void SetTitle(
+        const char* title) override;
 
     bool IsOpen() const override {
         return m_Open;
@@ -125,8 +127,7 @@ WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     return DefWindowProcA(hwnd, msg, wparam, lparam);
 }
 
-CWindow::CWindow(CWindowFactory* factory,
-    const WindowInitInfo& initInfo)
+CWindow::CWindow(const WindowInitInfo& initInfo)
     : m_Fullscreen(initInfo.Fullscreen), m_Open(false),
     m_Background(RGB(24, 48, 87)) {
 
@@ -260,10 +261,19 @@ CWindow::SetIcon(const char* path,
     return Result::Ok;
 }
 
+void
+CWindow::SetTitle(const char* title)
+{
+    if (!title)
+        return;
+
+    SetWindowTextA(m_Hwnd, title);
+}
+
 Result::Code
 CWindowFactory::OpenWindow(const WindowInitInfo& info,
     IWindow** outHandle) {
-    CWindow* temp{ new CWindow(this, info) };
+    CWindow* temp{ new CWindow(info) };
     if (!temp) {
         return Result::ENomemory;
     }

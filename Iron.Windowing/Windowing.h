@@ -43,6 +43,9 @@ public:
         const char* path,
         Math::V2 size) = 0;
 
+    virtual void SetTitle(
+        const char* title) = 0;
+
     virtual bool IsOpen() const = 0;
     virtual bool IsFullscreen() const = 0;
 };
