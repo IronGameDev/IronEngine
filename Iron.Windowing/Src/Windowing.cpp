@@ -44,6 +44,9 @@ public:
     void SetTitle(
         const char* title) override;
 
+    void SetFullscreen(
+        bool fullscreen) override;
+
     bool IsOpen() const override {
         return m_Open;
     }
@@ -61,6 +64,7 @@ private:
     bool                    m_Open;
     bool                    m_Fullscreen;
     DWORD                   m_Background;
+    RECT                    m_NormalRect;
 
     constexpr static DWORD  DefaultStyle{ WS_OVERLAPPEDWINDOW | WS_VISIBLE };
     constexpr static DWORD  DefaultExStyle{ WS_EX_OVERLAPPEDWINDOW };
@@ -129,7 +133,8 @@ WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 
 CWindow::CWindow(const WindowInitInfo& initInfo)
     : m_Fullscreen(initInfo.Fullscreen), m_Open(false),
-    m_Background(RGB(24, 48, 87)) {
+    m_Background(RGB(24, 48, 87)),
+    m_NormalRect() {
 
     WNDCLASSEXA wc{};
     wc.cbSize = sizeof(WNDCLASSEXA);
@@ -166,6 +171,7 @@ CWindow::CWindow(const WindowInitInfo& initInfo)
 
     ShowWindow(m_Hwnd, m_Fullscreen ? SW_MAXIMIZE : SW_SHOW);
     UpdateWindow(m_Hwnd);
+    GetWindowRect(m_Hwnd, &m_NormalRect);
 
     m_Open = true;
 }
@@ -186,8 +192,11 @@ CWindow::Hint(WindowHint::Hint hint) {
     case WindowHint::Close: {
         m_Open = false;
     } break;
-    case WindowHint::Resize:
-        break;
+    case WindowHint::Resize: {
+        if (!m_Fullscreen) {
+            GetWindowRect(m_Hwnd, &m_NormalRect);
+        }
+    } break;
     default:
         break;
     }
@@ -268,6 +277,36 @@ CWindow::SetTitle(const char* title)
         return;
 
     SetWindowTextA(m_Hwnd, title);
+}
+
+void
+CWindow::SetFullscreen(bool fullscreen)
+{
+    if (fullscreen) {
+        if (!m_Fullscreen) {
+            //Going to fullscreen
+            GetWindowRect(m_Hwnd, &m_NormalRect);
+            SetWindowLongPtrA(m_Hwnd, GWL_STYLE, 0);
+            SetWindowLongPtrA(m_Hwnd, GWL_EXSTYLE, 0);
+            ShowWindow(m_Hwnd, SW_SHOWMAXIMIZED);
+        }
+    }
+    else {
+        if (m_Fullscreen) {
+            //Return to normal
+            SetWindowLongPtrA(m_Hwnd, GWL_STYLE, DefaultStyle);
+            SetWindowLongPtrA(m_Hwnd, GWL_EXSTYLE, DefaultExStyle);
+            ShowWindow(m_Hwnd, SW_SHOWNORMAL);
+            MoveWindow(m_Hwnd,
+                m_NormalRect.left,
+                m_NormalRect.top,
+                (m_NormalRect.right - m_NormalRect.left),
+                (m_NormalRect.bottom - m_NormalRect.top),
+                TRUE);
+        }
+    }
+
+    m_Fullscreen = fullscreen;
 }
 
 Result::Code

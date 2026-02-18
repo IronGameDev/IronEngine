@@ -131,6 +131,11 @@ EngineContext::Run(const EngineInitInfo& Info, Application* const App)
         if (!m_MainWindow->IsOpen()) {
             m_Running = false;
         }
+
+        if (GetAsyncKeyState(VK_F1)) {
+            m_MainWindow->SetFullscreen(!m_MainWindow->IsFullscreen());
+            Sleep(200);
+        }
     }
 
     App->Shutdown();
@@ -145,6 +150,11 @@ EngineContext::Run(const EngineInitInfo& Info, Application* const App)
 IObjectBase* const
 EngineContext::LoadAndGetFactory(const char* DllName)
 {
+    if (!DllName) {
+        LOG_ERROR("LoadAndGetFactory() DllName cannot be nullptr!");
+        return nullptr;
+    }
+
     std::filesystem::path FullPath{ m_EngineDir };
     FullPath.append(DllName);
     const u64 Id{ Fnv1A(DllName) };

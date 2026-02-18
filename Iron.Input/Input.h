@@ -1,22 +1,25 @@
 #pragma once
 #include <Iron.Core/Core.h>
 
-MAKE_VERSION(input, 0, 2, 0)
+MAKE_VERSION(Input, 0, 2, 0)
 
-namespace iron::input {
-typedef class input_state_t* input_state;
+namespace Iron::Input {
+class IInputListener {
+public:
+    virtual ~IInputListener() = default;
 
-using input_callback = void(*)(input_type, key::code, modifier_key, void*);
-
-struct vtable_input {
-    version api_version;
-
-    result::code(*initialize)();
-    void(*shutdown)();
-
-    void(*input_proc)(void*, u32, u64, u64);
-    
-    void(*register_callback)(input_callback callback, void* user_data);
-    void(*unregister_callback)(input_callback callback);
+    virtual void OnEvent(Key::Code code, InputType::Type type, Math::V3 value) = 0;
 };
-} // namespace iron::input
+
+class IController {
+public:
+    virtual ~IController() = default;
+};
+
+class IInputFactory {
+public:
+    virtual ~IInputFactory() = default;
+
+    virtual s64 InputProc(void* hwnd, u32 msg, u64 wparam, u64 lparam) = 0;
+};
+}//namespace Iron::Input
