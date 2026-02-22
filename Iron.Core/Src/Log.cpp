@@ -24,6 +24,8 @@ constexpr static const char* g_Errors[Result::Count]{
     "EWritefile",
     "ENointerface",
     "ELoadIcon",
+    "ECreateRHIObject",
+    "ENotInitialized",
 };
 
 } // anonymous namespace
@@ -83,7 +85,7 @@ EnableLogIncludePath(bool  Enable) {
 void
 LogError(Result::Code Code, const char* File, int Line)
 {
-    if (Code > Result::Count)
+    if (Code >= Result::Count)
         return;
 
     if (Code == Result::Ok) {

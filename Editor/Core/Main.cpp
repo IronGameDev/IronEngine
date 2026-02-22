@@ -7,6 +7,7 @@
 #pragma comment(lib, "iron.engine.lib")
 
 using namespace Iron;
+using namespace Iron::RHI;
 using namespace Iron::Window;
 
 class Editor : public Application {
@@ -14,11 +15,9 @@ public:
     ~Editor() override = default;
 
     Result::Code PreInitialize() override {
-        using namespace RHI;
-        IRHIFactory* const factory{ (IRHIFactory* const)GetEngineAPI(EngineAPI::Renderer) };
-
-        IRHIAdapter* adapters[2]{};
-        factory->GetAdapters(&adapters[0], 2);
+        RHIGraphicsCmdList cmd{ 1024 * 64 };
+        cmd.Draw(12, 54);
+        cmd.DrawIndexedInstanced(1322, 354, 453, 51, 21);
 
         return Result::Code::Ok;
     }

@@ -92,8 +92,10 @@ struct Result {
         ESizemismatch,
         ELoadfile,
         EWritefile,
-        ENointerface,
+        ENoInterface,
         ELoadIcon,
+        ECreateRHIObject,
+        ENotInitialized,
 
         Count,
     };
@@ -422,6 +424,10 @@ constexpr f32 ConstexprRsqrt(f32 X) noexcept {
         Y = Y * (1.5f - 0.5f * X * Y * Y);
     }
     return Y;
+}
+
+constexpr inline u32 AlignUp(u32 v, u32 a) {
+    return (v + (a - 1)) & ~(a - 1);
 }
 
 template<typename T>

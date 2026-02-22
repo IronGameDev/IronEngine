@@ -60,6 +60,8 @@ EngineContext::~EngineContext() {
     std::filesystem::path ConfigPath{ "D:\\code\\IronEngine\\" };
     ConfigPath.append("settings.ini");
     ConfigFile Config{};
+    Config.Load(ConfigPath.string().c_str());
+
     Config.Set("engine.log", "enable_debug", std::to_string(m_LogEnableDebug).c_str());
     Config.Set("engine.log", "enable_info", std::to_string(m_LogEnableInfo).c_str());
     Config.Set("engine.log", "enable_warning", std::to_string(m_LogEnableWarning).c_str());
@@ -82,7 +84,7 @@ EngineContext::Run(const EngineInitInfo& Info, Application* const App)
 
     if (!App) {
         LOG_FATAL("No application interface!");
-        return Result::ENointerface;
+        return Result::ENoInterface;
     }
 
     Result::Code Res{ Result::Ok };
@@ -90,8 +92,11 @@ EngineContext::Run(const EngineInitInfo& Info, Application* const App)
     if (!m_Headless) {
         m_WindowFactory = (Window::IWindowFactory*)LoadAndGetFactory(
             g_ModuleNames[EngineAPI::Windowing]);
-        m_RHIFactory = (RHI::IRHIFactory*)LoadAndGetFactory(
-            g_ModuleNames[EngineAPI::Renderer]);
+        m_RenderContext = { LoadAndGetFactory(
+            g_ModuleNames[EngineAPI::Renderer]) };
+        if (Result::Fail(m_RenderContext.GetLastResult())) {
+            return m_RenderContext.GetLastResult();
+        }
 
         Res = App->PreInitialize();
         if (Result::Fail(Res)) {
@@ -174,7 +179,7 @@ EngineContext::GetEngineAPI(EngineAPI::Api Api) {
     case EngineAPI::Windowing:
         return m_WindowFactory;
     case EngineAPI::Renderer:
-        return m_RHIFactory;
+        return m_RenderContext.GetFactory();
     case EngineAPI::Input:
     case EngineAPI::Audio:
     case EngineAPI::Filesystem:

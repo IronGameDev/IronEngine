@@ -37,7 +37,7 @@ ModuleManager::LoadModule(const char* Path, u64 Id) {
         return Res;
     }
 
-    LOG_INFO("Loaded module %s Id=%ull", Path, Id);
+    LOG_INFO("Loaded module with factory %s Id=%ull", Path, Id);
     m_Modules[Id] = Mod;
 
     return Res;

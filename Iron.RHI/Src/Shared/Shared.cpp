@@ -1,10 +1,13 @@
 #include <Iron.RHI/Renderer.h>
+#include <Iron.RHI/Src/D3D11/BackendDX11.h>
+#include <Iron.RHI/Src/D3D12/BackendDX12.h>
 
 #include <dxgi1_6.h>
 
 #include <vector>
 #include <string>
 #include <codecvt>
+#include <filesystem>
 
 namespace Iron::RHI {
 namespace {
@@ -39,6 +42,14 @@ public:
         IRHIAdapter** adapters,
         u32 count) const override;
 
+    Result::Code CreateDevice(
+        IRHIAdapter* const adapter,
+        const DeviceInitInfo& info,
+        IRHIDevice** outHandle) override;
+
+    bool SupportsTearing() const override;
+    bool IsDebug() const override;
+
     void* const GetNative() const override;
 
 private:
@@ -46,6 +57,8 @@ private:
     PFN_CREATE_DXGI_FACTORY_2   m_CreateFactory;
     IDXGIFactory7*              m_Factory;
     std::vector<CRHIAdapter>    m_Adapters;
+    u32                         m_SupportsTearing;
+    bool                        m_EnableDebug;
 };
 
 class CRHIAdapter : public IRHIAdapter {
@@ -72,7 +85,9 @@ CRHIFactory::CRHIFactory()
     : m_DxgiDll(),
     m_CreateFactory(),
     m_Factory(),
-    m_Adapters() {
+    m_Adapters(),
+    m_SupportsTearing(),
+    m_EnableDebug() {
     m_DxgiDll = LoadLibraryExA("dxgi.dll", 0, LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (!m_DxgiDll) {
         LOG_FATAL("Failed to load dxgi.dll!");
@@ -85,10 +100,18 @@ CRHIFactory::CRHIFactory()
         return;
     }
 
+    std::filesystem::path ConfigPath{ "D:\\code\\IronEngine\\" };
+    ConfigPath.append("settings.ini");
+    ConfigFile Config{};
+    if (Result::Success(Config.Load(ConfigPath.string().c_str()))) {
+        m_EnableDebug = atoi(Config.Get("rhi", "debug_factory", "0"));
+    }
+
     u32 flags{ 0 };
-#if !SHIPPING
-    flags |= DXGI_CREATE_FACTORY_DEBUG;
-#endif
+    if (m_EnableDebug) {
+        flags |= DXGI_CREATE_FACTORY_DEBUG;
+        LOG_DEBUG("Enabled debug factory");
+    }
 
     HRESULT hr{ S_OK };
     hr = m_CreateFactory(0, IID_PPV_ARGS(&m_Factory));
@@ -103,6 +126,8 @@ CRHIFactory::CRHIFactory()
         ++i) {
         m_Adapters.emplace_back(adapter);
     }
+
+    m_Factory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &m_SupportsTearing, sizeof(u32));
 }
 
 void
@@ -125,7 +150,8 @@ CRHIFactory::GetAdapterCount() const {
 }
 
 void
-CRHIFactory::GetAdapters(IRHIAdapter** adapters, u32 count) const {
+CRHIFactory::GetAdapters(IRHIAdapter** adapters,
+    u32 count) const {
     if (!adapters) {
         return;
     }
@@ -135,6 +161,64 @@ CRHIFactory::GetAdapters(IRHIAdapter** adapters, u32 count) const {
     for (u32 i{ 0 }; i < num; ++i) {
         adapters[i] = (IRHIAdapter*)&m_Adapters[i];
     }
+}
+
+Result::Code
+CRHIFactory::CreateDevice(IRHIAdapter* const adapter,
+    const DeviceInitInfo& info,
+    IRHIDevice** outHandle) {
+    if (!(adapter && outHandle)) {
+        return Result::ENullptr;
+    }
+
+    if (!adapter->GetNative()) {
+        return Result::EInvalidarg;
+    }
+
+    switch (info.Backend)
+    {
+    case RHIBackend::DirectX11: {
+        D3D11::CRHIDevice_DX11* temp{ nullptr };
+        //D3D11::CRHIDevice_DX11* temp{ new D3D11::CRHIDevice_DX11(adapter, info) };
+        if (!temp) {
+            return Result::ENomemory;
+        }
+
+        if (!temp->GetNative()) {
+            SafeRelease(temp);
+            return Result::ECreateRHIObject;
+        }
+
+        *outHandle = temp;
+    } break;
+    case RHIBackend::DirectX12: {
+        D3D12::CRHIDevice_DX12* temp{ new D3D12::CRHIDevice_DX12(this, adapter, info) };
+        if (!temp) {
+            return Result::ENomemory;
+        }
+
+        if (!temp->GetNative()) {
+            SafeRelease(temp);
+            return Result::ECreateRHIObject;
+        }
+
+        *outHandle = temp;
+    } break;
+    default:
+        return Result::EInvalidarg;
+    }
+
+    return Result::Ok;
+}
+
+bool
+CRHIFactory::SupportsTearing() const {
+    return m_SupportsTearing;
+}
+
+bool
+CRHIFactory::IsDebug() const {
+    return m_EnableDebug;
 }
 
 void* const

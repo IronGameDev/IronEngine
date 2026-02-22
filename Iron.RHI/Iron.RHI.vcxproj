@@ -145,11 +145,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Src\D3D11\BackendDX11.cpp" />
+    <ClCompile Include="Src\D3D12\BackendDX12.cpp" />
     <ClCompile Include="Src\dllmain.cpp" />
     <ClCompile Include="Src\Shared\Shared.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="Src\D3D11\BackendDX11.h" />
+    <ClInclude Include="Src\D3D12\BackendDX12.h" />
+    <ClInclude Include="Src\Shared\Shared.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

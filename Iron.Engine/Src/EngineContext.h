@@ -1,6 +1,7 @@
 #pragma once
 #include <Iron.Engine/Engine.h>
 #include <Iron.Engine/Src/Modules/Modules.h>
+#include <Iron.Engine/Src/Renderer/Renderer.h>
 #include <Iron.Windowing/Windowing.h>
 #include <Iron.RHI/Renderer.h>
 
@@ -25,7 +26,7 @@ public:
     Window::IWindowFactory*     m_WindowFactory{};
     Window::IWindow*            m_MainWindow{};
 
-    RHI::IRHIFactory*           m_RHIFactory{};
+    RenderContext               m_RenderContext{};
 
     std::atomic<bool>           m_Running{};
 
