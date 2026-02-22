@@ -48,6 +48,10 @@ public:
     virtual void SetFullscreen(
         bool fullscreen) = 0;
 
+    virtual u32 GetWidth() const = 0;
+    virtual u32 GetHeight() const = 0;
+    virtual void* const GetNative() const = 0;
+
     virtual bool IsOpen() const = 0;
     virtual bool IsFullscreen() const = 0;
 };

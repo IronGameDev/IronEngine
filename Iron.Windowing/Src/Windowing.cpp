@@ -47,6 +47,18 @@ public:
     void SetFullscreen(
         bool fullscreen) override;
 
+    u32 GetWidth() const override {
+        return (u32)(m_CurrentRect.right - m_CurrentRect.left);
+    }
+
+    u32 GetHeight() const override {
+        return (u32)(m_CurrentRect.bottom - m_CurrentRect.top);
+    }
+
+    void* const GetNative() const override {
+        return m_Hwnd;
+    }
+
     bool IsOpen() const override {
         return m_Open;
     }
@@ -65,6 +77,7 @@ private:
     bool                    m_Fullscreen;
     DWORD                   m_Background;
     RECT                    m_NormalRect;
+    RECT                    m_CurrentRect;
 
     constexpr static DWORD  DefaultStyle{ WS_OVERLAPPEDWINDOW | WS_VISIBLE };
     constexpr static DWORD  DefaultExStyle{ WS_EX_OVERLAPPEDWINDOW };
@@ -110,11 +123,11 @@ WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
             LOG_ERROR("Close message send to invalid window!");
             break;
         }
-        
+
         const HDC hdc{ (HDC)wparam };
         RECT rc{};
         GetClientRect(hwnd, &rc);
-        
+
         const HBRUSH brush{ CreateSolidBrush(parent->GetBackgroundDWORD()) };
         FillRect(hdc, &rc, brush);
         DeleteObject(brush);
@@ -134,7 +147,8 @@ WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 CWindow::CWindow(const WindowInitInfo& initInfo)
     : m_Fullscreen(false), m_Open(false),
     m_Background(RGB(24, 48, 87)),
-    m_NormalRect() {
+    m_NormalRect(),
+    m_CurrentRect() {
 
     WNDCLASSEXA wc{};
     wc.cbSize = sizeof(WNDCLASSEXA);
@@ -172,6 +186,7 @@ CWindow::CWindow(const WindowInitInfo& initInfo)
     ShowWindow(m_Hwnd, m_Fullscreen ? SW_MAXIMIZE : SW_SHOW);
     UpdateWindow(m_Hwnd);
     GetWindowRect(m_Hwnd, &m_NormalRect);
+    GetClientRect(m_Hwnd, &m_CurrentRect);
 
     m_Open = true;
 }
@@ -196,6 +211,7 @@ CWindow::Hint(WindowHint::Hint hint) {
         if (!m_Fullscreen) {
             GetWindowRect(m_Hwnd, &m_NormalRect);
         }
+        GetClientRect(m_Hwnd, &m_CurrentRect);
     } break;
     default:
         break;
