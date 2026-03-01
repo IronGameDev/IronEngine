@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
     engine_info.ArgV = argv;
     engine_info.Headless = false;
     engine_info.Window.Fullscreen = false;
-
+    
     Editor instance{};
 
     Result::Code result{};

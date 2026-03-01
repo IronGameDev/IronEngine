@@ -1,15 +1,24 @@
 #pragma once
 #include <Iron.Core/Core.h>
 
+#define RHI_TEMPORAL_COUNT_BITS 4
+#define RHI_VIEW_INDEX_BITS 12
 #define RHI_MAX_NAME 128
+#define RHI_MAX_TEMPORAL 1 << RHI_TEMPORAL_COUNT_BITS
+#define RHI_MAX_VIEWS_PER_TYPE 1 << RHI_VIEW_INDEX_BITS
+#define RHI_MAX_TARGET_COUNT 8
 
 #ifndef RHI_ENABLE_STREAM_CHECK
 #define RHI_ENABLE_STREAM_CHECK 1
 #endif
 
-namespace Iron::RHI {
-typedef u32 FGResource;
+#if RHI_ENABLE_STREAM_CHECK
+#define RHI_VALIDATE_CMD(x) if(!x) { LOG_ERROR("Buffer for commands is full, consider a larger size!"); }
+#else
+#define RHI_VALIDATE_CMD(x) x
+#endif
 
+namespace Iron::RHI {
 struct RHIBackend {
     enum Value : u32 {
         DirectX11 = 0,
@@ -154,8 +163,7 @@ struct AdapterType {
     };
 };
 
-struct CommandBuilderType
-{
+struct CommandBuilderType {
     enum Type : u8 {
         Graphics = 0,
         Compute,
@@ -163,10 +171,106 @@ struct CommandBuilderType
     };
 };
 
+struct ResourceDimension {
+    enum Dim : u32 {
+        Unknown = 0,
+        Buffer,
+        Texture1D,
+        Texture2D,
+        Texture3D,
+    };
+};
+
+struct ResourceUsage {
+    enum Usage : u32 {
+        Default = 0,
+        Immutable,
+        Dynamic,
+        Copy,
+    };
+};
+
+struct ResourceFlags {
+    enum Flags : u32 {
+        None = 0x00,
+        AllowShaderResource = 0x01,
+        BindVertexBuffer = 0x02,
+        BindIndexBuffer = 0x04,
+        TextureCube = 0x08,
+        Structured = 0x10,
+    };
+};
+
+struct ResourceState {
+    enum State : u32 {
+        Generic = 0,
+        VertexBuffer = 0x01,
+        IndexBuffer = 0x02,
+        ConstantBuffer = 0x04,
+        RenderTarget = 0x08,
+        UnorderedAccess = 0x10,
+        DepthRead = 0x20,
+        DepthWrite = 0x40,
+        PixelResource = 0x80,
+        NonPixelResource = 0x100,
+        IndirectArgs = 0x200,
+        CopyDest = 0x400,
+        CopySrc = 0x800,
+        Present = 0x1000,
+    };
+};
+
+struct ResourceViewType {
+    enum Type : u32 {
+        ShaderResource = 0,
+        RenderTarget,
+        DepthStencil,
+        UnorderedAccess,
+    };
+};
+
+struct FGResourceType {
+    enum Type : u32 {
+        Texture = 0,
+        Buffer,
+        Swapchain
+    };
+};
+
+struct FGClearOp {
+    enum Op : u32 {
+        None = 0,
+        RenderTarget,
+        DepthStencil,
+    };
+};
+
+struct FGCompileFlags {
+    enum Flags : u32 {
+        None = 0x00,
+        LogInfo = 0x01,
+        DebugNames = 0x02,
+    };
+};
+
 struct DeviceInitInfo {
     RHIBackend::Value   Backend;
     bool                Debug;
     bool                DisableGPUTimeout;
+};
+
+struct ResourceInitInfo {
+    ResourceDimension::Dim  Dimension;
+    u32                     Width;
+    u32                     Height;
+    u32                     DepthOrArray;
+    u32                     StructuredStride;
+    u32                     MipLevels;
+    RHIFormat::Fmt          Format;
+    ResourceUsage::Usage    Usage;
+    bool                    CPURead;
+    bool                    CPUWrite;
+    u32                     Flags;
 };
 
 struct SurfaceInitInfo {
@@ -178,12 +282,118 @@ struct SurfaceInitInfo {
     bool                AllowTearing;
 };
 
-struct FGResourceInitInfo {
+struct SubresourceRange {
+    u32                             BaseMip{ 0 };
+    u32                             MipCount{ 1 };
+    u32                             BaseLayer{ 0 };
+    u32                             LayerCount{ 1 };
+    u32                             Plane{ 0 }; // depth=0, stencil=1, etc.
 };
 
+struct DepthStencilClear {
+    f32                             Depth;
+    u8                              Stencil;
+};
+
+struct ClearValue {
+    union {
+        f32                         Color[4];
+        DepthStencilClear           Depth;
+    };
+};
+
+struct FGResourceInitInfo {
+    const char*                     Name;
+    FGResourceType::Type            Type{};
+    u32                             Width{};
+    u32                             Height{};
+    u32                             DepthOrArray{ 1 };
+    u32                             MipLevels{ 1 };
+    RHIFormat::Fmt                  StorageFormat{}; //MUST be typeless
+    u32                             TemporalCount{ 1 };
+
+
+    constexpr FGResourceInitInfo(
+        const char*                     name,
+        FGResourceType::Type            type,
+        u32                             width,
+        u32                             height,
+        RHIFormat::Fmt                  storageFormat,
+        u32                             depthOrArray = 1,
+        u32                             mipLevels = 1,
+        u32                             temporal = 1) {
+        Name = StrDup(name);
+        Type = type;
+        Width = width;
+        Height = height;
+        DepthOrArray = depthOrArray;
+        MipLevels = mipLevels;
+        StorageFormat = storageFormat;
+        TemporalCount = temporal;
+    }
+
+    constexpr u8 GetFlags() const {
+        return Flag_Field;
+    }
+
+    constexpr ResourceState::State GetLastState() const {
+        return Last_State;
+    }
+
+private:
+    friend class RHIGraphBuilder;
+    u8                              Flag_Field{};
+    ResourceState::State            Last_State{};
+};
+
+constexpr static bool
+FmtIsTypeless(RHIFormat::Fmt fmt) {
+    return fmt == RHIFormat::B8G8R8A8_TYPELESS
+        || fmt == RHIFormat::B8G8R8X8_TYPELESS
+        || fmt == RHIFormat::BC1_TYPELESS
+        || fmt == RHIFormat::BC2_TYPELESS
+        || fmt == RHIFormat::BC3_TYPELESS
+        || fmt == RHIFormat::BC4_TYPELESS
+        || fmt == RHIFormat::BC5_TYPELESS
+        || fmt == RHIFormat::BC6H_TYPELESS
+        || fmt == RHIFormat::BC7_TYPELESS
+        || fmt == RHIFormat::R10G10B10A2_TYPELESS
+        || fmt == RHIFormat::R16G16B16A16_TYPELESS
+        || fmt == RHIFormat::R16G16_TYPELESS
+        || fmt == RHIFormat::R16_TYPELESS
+        || fmt == RHIFormat::R24G8_TYPELESS
+        || fmt == RHIFormat::R24_UNORM_X8_TYPELESS
+        || fmt == RHIFormat::R32G32B32A32_TYPELESS
+        || fmt == RHIFormat::R32G32B32_TYPELESS
+        || fmt == RHIFormat::R32G32_TYPELESS
+        || fmt == RHIFormat::R32G8X24_TYPELESS
+        || fmt == RHIFormat::R32_FLOAT_X8X24_TYPELESS
+        || fmt == RHIFormat::R32_TYPELESS
+        || fmt == RHIFormat::R8G8B8A8_TYPELESS
+        || fmt == RHIFormat::R8G8_TYPELESS
+        || fmt == RHIFormat::R8_TYPELESS
+        || fmt == RHIFormat::X24_TYPELESS_G8_UINT
+        || fmt == RHIFormat::X32_TYPELESS_G8X24_UINT;
+}
+
+constexpr static bool
+FmtIsDepth(RHIFormat::Fmt fmt) {
+    return fmt == RHIFormat::D16_UNORM
+        || fmt == RHIFormat::D24_UNORM_S8_UINT
+        || fmt == RHIFormat::D32_FLOAT
+        || fmt == RHIFormat::D32_FLOAT_S8X24_UINT;
+}
+
+typedef u32 FGResource;
+class RHICommandBuilder;
+class RHIGraphBuilder;
 class IRHIAdapter;
 class IRHIDevice;
+class IRHIResource;
 class IRHISurface;
+class IRHIFrameGraph;
+
+typedef void(*FGPassFunc)(RHICommandBuilder&);
 
 class IRHIFactory : public IObjectBase {
 public:
@@ -220,9 +430,25 @@ class IRHIDevice : public IObjectBase {
 public:
     virtual ~IRHIDevice() = default;
 
+    virtual Result::Code CreateResource(
+        const ResourceInitInfo& info,
+        IRHIResource** resource) = 0;
+
     virtual Result::Code CreateSurface(
         const SurfaceInitInfo& info,
         IRHISurface** surface) = 0;
+
+    virtual Result::Code CreateFrameGraph(
+        const RHIGraphBuilder& builder,
+        u32 flags,
+        IRHIFrameGraph** outHandle) = 0;
+
+    virtual void* const GetNative() const = 0;
+};
+
+class IRHIResource : public IObjectBase {
+public:
+    virtual ~IRHIResource() = default;
 
     virtual void* const GetNative() const = 0;
 };
@@ -238,21 +464,207 @@ public:
 class IRHIFrameGraph : public IObjectBase {
 public:
     virtual ~IRHIFrameGraph() = default;
+
+    virtual void Execute() = 0;
 };
 
 class RHIGraphBuilder {
+    static constexpr u32 InvalidPass = ~0u;
 public:
-    FGResource CreateResource() {
+    constexpr static u8 ResourceFlag_SRV{ 0x01 };
+    constexpr static u8 ResourceFlag_RTV{ 0x02 };
+    constexpr static u8 ResourceFlag_DSV{ 0x04 };
+    constexpr static u8 ResourceFlag_UAV{ 0x08 };
 
+    struct FGResourceUsage
+    {
+        FGResource                      Resource;
+        ResourceState::State            State;
+        RHIFormat::Fmt                  ViewFormat;
+        SubresourceRange                Range;
+        FGClearOp::Op                   ClearOp{ FGClearOp::None };
+        ClearValue                      ClearValue;
+    };
+
+    struct FGPassDesc
+    {
+        const char*                     Name{};
+        FGPassFunc                      Func{};
+        Vector<FGResourceUsage>         Reads{};
+        Vector<FGResourceUsage>         Writes{};
+    };
+
+public:
+    FGResource RegisterOutput(
+        const char* name,
+        u32 width,
+        u32 height,
+        RHIFormat::Fmt format,
+        bool tripleBuffering) {
+        FGResourceInitInfo desc(
+            name,
+            FGResourceType::Swapchain,
+            width,
+            height,
+            format,
+            1,
+            1,
+            tripleBuffering ? 3 : 2
+        );
+
+        FGResource handle{ (FGResource)m_Resources.Size() };
+        m_Resources.PushBack(desc);
+        return handle;
+    }
+
+    FGResource CreateResource(
+        const FGResourceInitInfo& desc) {
+        if (!FmtIsTypeless(desc.StorageFormat)) {
+            LOG_ERROR("RHI: Task Graph base resource MUST be typeless!");
+            return (FGResource)~0;
+        }
+
+        FGResource handle{ (FGResource)m_Resources.Size() };
+
+        m_Resources.PushBack(desc);
+        return handle;
+    }
+
+    u32 BeginPass(
+        const char* name,
+        FGPassFunc func) {
+        if (m_BuildingPass) {
+            LOG_ERROR("RHI: Nested passes are not allowed");
+        }
+        if (!func) {
+            LOG_ERROR("RHI: Nullptr func passed to BeginPass()!");
+        }
+
+        u32 handle{ m_Passes.Size() };
+
+        FGPassDesc pass{};
+        pass.Name = StrDup(name);
+        pass.Func = func;
+
+        m_Passes.PushBack(pass);
+        m_CurrentPass = handle;
+        m_BuildingPass = true;
+
+        return handle;
+    }
+
+    void EndPass() {
+        ValidatePass();
+        m_BuildingPass = false;
+        m_CurrentPass = InvalidPass;
+    }
+
+    void Read(
+        FGResource          resource,
+        RHIFormat::Fmt      viewFormat,
+        u32                 state,
+        SubresourceRange    range = {}) {
+        ValidatePass();
+        AddFlags(resource, (ResourceState::State)state);
+        const FGResourceUsage usage{ resource, (ResourceState::State)state, viewFormat, range };
+        m_Passes[m_CurrentPass].Reads.PushBack(usage);
+    }
+
+    void Write(
+        FGResource          resource,
+        RHIFormat::Fmt      viewFormat,
+        u32                 state,
+        SubresourceRange    range = {}) {
+        ValidatePass();
+        AddFlags(resource, (ResourceState::State)state);
+        const FGResourceUsage usage{ resource, (ResourceState::State)state, viewFormat, range };
+        m_Passes[m_CurrentPass].Writes.PushBack(usage);
+    }
+
+    void WriteClear(
+        FGResource          resource,
+        RHIFormat::Fmt      viewFormat,
+        u32                 state,
+        ClearValue          clear,
+        SubresourceRange    range = {}) {
+        ValidatePass();
+        AddFlags(resource, (ResourceState::State)state);
+        const FGResourceUsage usage{ resource, (ResourceState::State)state, viewFormat, range,
+        FmtIsDepth(viewFormat)
+                        ? FGClearOp::DepthStencil
+                        : FGClearOp::RenderTarget,
+            clear };
+        m_Passes[m_CurrentPass].Writes.PushBack(usage);
+    }
+
+    void ReadWrite(
+        FGResource          resource,
+        RHIFormat::Fmt      viewFormat,
+        u32                 state,
+        SubresourceRange    range = {}) {
+        ValidatePass();
+        AddFlags(resource, (ResourceState::State)state);
+        m_Passes[m_CurrentPass].Writes.PushBack(
+            { resource, (ResourceState::State)state, viewFormat, range });
+    }
+
+    const Vector<FGPassDesc>& GetPasses() const {
+        return m_Passes;
+    }
+
+    const Vector<FGResourceInitInfo>& GetResources() const {
+        return m_Resources;
     }
 
 private:
+    void AddFlags(FGResource resource, ResourceState::State state) {
+        m_Resources[resource].Last_State = state;
+
+        if (state & ResourceState::RenderTarget) {
+            m_Resources[resource].Flag_Field |= ResourceFlag_RTV;
+        }
+        if (state & ResourceState::DepthRead
+            || state & ResourceState::DepthWrite) {
+            m_Resources[resource].Flag_Field |= ResourceFlag_DSV;
+        }
+        if (state & ResourceState::PixelResource
+            || state & ResourceState::NonPixelResource) {
+            m_Resources[resource].Flag_Field |= ResourceFlag_SRV;
+        }
+        if (state & ResourceState::UnorderedAccess) {
+            m_Resources[resource].Flag_Field |= ResourceFlag_UAV;
+        }
+    }
+
+    void ValidatePass() const {
+        if (!m_BuildingPass) {
+            LOG_ERROR("RHI: No active pass!");
+        }
+        if (m_CurrentPass == InvalidPass) {
+            LOG_ERROR("RHI: Invalid pass!");
+        }
+    }
+
+    void Reset() {
+        m_Passes.Clear();
+        m_Resources.Clear();
+        m_CurrentPass = InvalidPass;
+        m_BuildingPass = false;
+    }
+
+
+    Vector<FGPassDesc>          m_Passes{};
+    Vector<FGResourceInitInfo>  m_Resources{};
+
+    u32                         m_CurrentPass{ InvalidPass };
+    bool                        m_BuildingPass{ false };
 };
 
 class RHICommandBuilder {
 public:
     struct CommandId {
         enum Id : u16 {
+            CopyResource,
             Draw,
             DrawInstanced,
             DrawIndexed,
@@ -264,6 +676,11 @@ public:
     {
         u16 Id;
         u16 Size;
+    };
+
+    struct CmdCopyResourceInfo {
+        IRHIResource*   Src;
+        IRHIResource*   Dst;
     };
 
     struct CmdDrawInfo {
@@ -368,7 +785,14 @@ private:
 
 class RHITransferCommandList : public RHICommandBuilder {
 public:
-
+    inline void CopyResource(IRHIResource* Src,
+        IRHIResource* Dst) {
+        RHI_VALIDATE_CMD(Allocate(CommandId::CopyResource,
+            CmdCopyResourceInfo{
+                Src,
+                Dst
+            }))
+    }
 };
 
 class RHIComputeCommandList : public RHITransferCommandList {
@@ -378,48 +802,48 @@ public:
 
 class RHIGraphicsCmdList : public RHIComputeCommandList {
 public:
-    void Draw(u32 VertexCount,
+    inline void Draw(u32 VertexCount,
         u32 BaseVertex) {
-        Allocate(CommandId::Draw, CmdDrawInfo{
+        RHI_VALIDATE_CMD(Allocate(CommandId::Draw, CmdDrawInfo{
             VertexCount,
             BaseVertex
-            });
+            }))
     }
 
-    void DrawInstanced(u32 VertexCount,
+    inline void DrawInstanced(u32 VertexCount,
         u32 InstanceCount,
         u32 BaseVertex,
         u32 BaseInstance) {
-        Allocate(CommandId::DrawInstanced, CmdDrawInstancedInfo{
+        RHI_VALIDATE_CMD(Allocate(CommandId::DrawInstanced, CmdDrawInstancedInfo{
             VertexCount,
             InstanceCount,
             BaseVertex,
             BaseInstance
-            });
+            }))
     }
 
-    void DrawIndexed(u32 IndexCount,
+    inline void DrawIndexed(u32 IndexCount,
         u32 BaseIndex,
         u32 BaseVertex) {
-        Allocate(CommandId::DrawIndexed, CmdDrawIndexedInfo{
+        RHI_VALIDATE_CMD(Allocate(CommandId::DrawIndexed, CmdDrawIndexedInfo{
             IndexCount,
             BaseIndex,
             BaseVertex
-            });
+            }))
     }
 
-    void DrawIndexedInstanced(u32 IndexCount,
+    inline void DrawIndexedInstanced(u32 IndexCount,
         u32 InstanceCount,
         u32 BaseIndex,
         u32 BaseVertex,
         u32 BaseInstance) {
-        Allocate(CommandId::DrawIndexedInstanced, CmdDrawInstancedIndexedInfo{
+        RHI_VALIDATE_CMD(Allocate(CommandId::DrawIndexedInstanced, CmdDrawInstancedIndexedInfo{
             IndexCount,
             InstanceCount,
             BaseIndex,
             BaseVertex,
             BaseInstance
-            });
+            }))
     }
 };
 }

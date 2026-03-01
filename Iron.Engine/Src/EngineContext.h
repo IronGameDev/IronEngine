@@ -26,7 +26,7 @@ public:
     Window::IWindowFactory*     m_WindowFactory{};
     Window::IWindow*            m_MainWindow{};
 
-    RenderContext               m_RenderContext{};
+    RenderContext*              m_RenderContext{};
 
     std::atomic<bool>           m_Running{};
 

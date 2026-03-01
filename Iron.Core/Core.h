@@ -1,4 +1,5 @@
 #pragma once
+#include <new>
 
 #if !(defined(_WIN32) || defined(_WIN64))
 #error "Non-Windows platforms are not supported!"
@@ -77,7 +78,6 @@ constexpr static u64 Fnv1A(const char* Str) {
 
 #define IRON_MAX_PATH 260
 
-
 namespace Iron {
 struct Result {
     enum Code : u32 {
@@ -95,6 +95,7 @@ struct Result {
         ENoInterface,
         ELoadIcon,
         ECreateRHIObject,
+        ECreateResource,
         ENotInitialized,
 
         Count,
@@ -170,10 +171,56 @@ struct ModifierKey {
     };
 };
 
+CORE_API void* MemAlloc(size_t Size);
+CORE_API void MemFree(void* Block);
+CORE_API void MemSet(void* Dst, u8 Value, size_t Size);
+CORE_API void MemCopy(void* Dst, const void* Src, size_t Size);
+CORE_API void MemCopyS(void* Dst, const void* Src, size_t DstSize, size_t SrcSize);
+
+CORE_API void Log(LogLevel::Level Level, const char* File, int Line, const char* Msg, ...);
+CORE_API void EnableLogLevel(LogLevel::Level Level, bool Enable);
+CORE_API void EnableLogIncludePath(bool Enable);
+CORE_API void LogError(Result::Code Code, const char* File, int Line);
+
+template<typename T>
+static T&& Move(T& Obj) {
+    return static_cast<T&&>(Obj);
+}
+
+constexpr static inline bool IsSpace(char C) {
+    return C == ' ' ||
+        C == '\t' ||
+        C == '\n' ||
+        C == '\r' ||
+        C == '\v' ||
+        C == '\f';
+}
+
 constexpr static inline size_t StrLen(const char* Str) {
     size_t Len{ 0 };
     while (*Str++ != '\0') ++Len;
     return Len;
+}
+
+constexpr static inline char* StrDup(const char* S) {
+    if (!S) return nullptr;
+    size_t Len{ StrLen(S) + 1 };
+    char* Out = (char*)MemAlloc(Len);
+    if (!Out) return nullptr;
+    MemCopy(Out, S, Len);
+    return Out;
+}
+
+constexpr static inline char* Trim(char* Str) {
+    if (!Str) return nullptr;
+
+    while (IsSpace(*Str)) ++Str;
+
+    char* End{ Str + StrLen(Str) };
+    while (End > Str && IsSpace(*(End - 1))) --End;
+    *End = '\0';
+
+    return Str;
 }
 
 template<typename T>
@@ -185,17 +232,6 @@ template<typename T>
 constexpr static inline T MaxT(T X, T Y) {
     return X > Y ? X : Y;
 }
-
-CORE_API void* MemAlloc(size_t Size);
-CORE_API void MemFree(void* Block);
-CORE_API void MemSet(void* Dst, u8 Value, size_t Size);
-CORE_API void MemCopy(void* Dst, const void* Src, size_t Size);
-CORE_API void MemCopyS(void* Dst, const void* Src, size_t DstSize, size_t SrcSize);
-
-CORE_API void Log(LogLevel::Level Level, const char* File, int Line, const char* Msg, ...);
-CORE_API void EnableLogLevel(LogLevel::Level Level, bool Enable);
-CORE_API void EnableLogIncludePath(bool Enable);
-CORE_API void LogError(Result::Code Code, const char* File, int Line);
 
 class IObjectBase {
 public:
@@ -212,20 +248,144 @@ void SafeRelease(T*& ptr) {
     }
 }
 
-//Important! No constructors/destructors will be called here!
+class StreamWriter {
+public:
+    StreamWriter() = default;
 
-template<typename T>
+    StreamWriter(u8* blob, u32 size)
+        : m_Stream(nullptr), m_Offset(0), m_Size(0) {
+        Initialize(blob, size);
+    }
+
+    bool Initialize(u8* blob, u32 size) {
+        if (!(blob && size)) {
+            return false;
+        }
+
+        m_Stream = blob;
+        m_Offset = 0;
+        m_Size = size;
+
+        return true;
+    }
+
+    template<typename T>
+    void Write(const T& value) {
+        constexpr u32 size{ sizeof(value) };
+        if (m_Offset + size > m_Size) {
+            return;
+        }
+
+        *m_Stream[m_Offset] = value;
+        m_Offset += size;
+    }
+
+    void Write(const u8* const buffer, u32 size) {
+        if (m_Offset + size > m_Size) {
+            return;
+        }
+
+        MemCopy(&m_Stream[m_Offset], buffer, size);
+        m_Offset += size;
+    }
+
+    void SetPos(u32 offset) {
+        if (offset > m_Size) {
+            return;
+        }
+
+        m_Offset = offset;
+    }
+
+    constexpr u32 Offset() const {
+        return m_Offset;
+    }
+
+    constexpr u32 Size() const {
+        return m_Size;
+    }
+
+private:
+    u8*         m_Stream;
+    u32         m_Offset;
+    u32         m_Size;
+};
+
+class StreamReader {
+public:
+    StreamReader() = default;
+
+    StreamReader(const u8* blob)
+        : m_Stream(blob), m_Position(blob) {
+    }
+
+    template<typename T>
+    T Read() {
+        const T value{ *((T*)m_Position) };
+        m_Position += sizeof(T);
+        return value;
+    }
+
+    void Read(u8* buffer, size_t length) {
+        MemCopy(buffer, m_Position, length);
+        m_Position += length;
+    }
+
+    constexpr void Skip(size_t offset) {
+        m_Position += offset;
+    }
+
+    constexpr const u8* const Start() const { return m_Stream; }
+    constexpr const u8* const Position() const { return m_Position; }
+    constexpr size_t Offset() const { return m_Position - m_Stream; }
+
+private:
+    const u8* const m_Stream;
+    const u8*       m_Position;
+};
+
+//Important! No constructors/destructors will be called!
+template<typename T, bool destruct = true>
 class Vector {
 public:
     using ValueType = T;
 
     Vector() : m_Data(nullptr), m_Size(0), m_Capacity(0) {}
 
+    Vector(u32 size)
+        : m_Data(nullptr), m_Size(0), m_Capacity(0) {
+        Resize(size);
+    }
+
     Vector(const Vector& Other)
         : m_Data(nullptr), m_Size(0), m_Capacity(0) {
         Reserve(Other.m_Size);
         m_Size = Other.m_Size;
         MemCopy(m_Data, Other.m_Data, m_Size * sizeof(T));
+    }
+
+    Vector(u32 Size, const T& Value)
+        : m_Data(nullptr), m_Size(0), m_Capacity(0) {
+        if (Size == 0)
+            return;
+
+        Reserve(Size);
+        m_Size = Size;
+
+        for (u32 i = 0; i < Size; ++i)
+            m_Data[i] = Value;
+    }
+
+    template<typename It>
+    Vector(It First, It Last)
+        : m_Data(nullptr), m_Size(0), m_Capacity(0) {
+        const u32 Count{ static_cast<u32>(Last - First) };
+        Reserve(Count);
+        m_Size = Count;
+
+        u32 Index = 0;
+        for (It Itor = First; Itor != Last; ++Itor)
+            m_Data[Index++] = *Itor;
     }
 
     Vector& operator=(const Vector& Other) {
@@ -237,18 +397,41 @@ public:
         return *this;
     }
 
+    Vector(Vector&& Other) noexcept
+        : m_Data(Other.m_Data),
+        m_Size(Other.m_Size),
+        m_Capacity(Other.m_Capacity) {
+        Other.m_Data = nullptr;
+        Other.m_Size = 0;
+        Other.m_Capacity = 0;
+    }
+
     ~Vector() {
-        if (m_Data) MemFree(m_Data);
+        Clear();
+
+        if (m_Data)
+            MemFree(m_Data);
     }
 
     void Reserve(u32 NewCapacity) {
-        if (NewCapacity <= m_Capacity) return;
+        if (NewCapacity <= m_Capacity)
+            return;
+
         T* NewData = (T*)MemAlloc(NewCapacity * sizeof(T));
-        if (!NewData) return;
-        if (m_Data) {
-            MemCopy(NewData, m_Data, m_Size * sizeof(T));
-            MemFree(m_Data);
+        if (!NewData)
+            return;
+
+        for (u32 i = 0; i < m_Size; ++i)
+            new (&NewData[i]) T(Move(m_Data[i]));
+
+        if constexpr (destruct) {
+            for (u32 i = 0; i < m_Size; ++i)
+                m_Data[i].~T();
         }
+
+        if (m_Data)
+            MemFree(m_Data);
+
         m_Data = NewData;
         m_Capacity = NewCapacity;
     }
@@ -256,26 +439,123 @@ public:
     void Resize(u32 NewSize) {
         if (NewSize > m_Capacity)
             Reserve(GrowCapacity(NewSize));
+
+        if (NewSize > m_Size) {
+            for (u32 i = m_Size; i < NewSize; ++i)
+                new (&m_Data[i]) T();
+        }
+        else if (NewSize < m_Size) {
+            if constexpr (destruct) {
+                for (u32 i = NewSize; i < m_Size; ++i)
+                    m_Data[i].~T();
+            }
+        }
+
         m_Size = NewSize;
     }
 
-    void Clear() { m_Size = 0; }
+    void Clear() {
+        if constexpr (destruct) {
+            for (u32 i = 0; i < m_Size; ++i)
+                m_Data[i].~T();
+        }
+
+        m_Size = 0;
+    }
+
+    template<typename... Args>
+    T& EmplaceBack(Args&&... args) {
+        if (m_Size >= m_Capacity)
+            Reserve(GrowCapacity(m_Size + 1));
+
+        new (&m_Data[m_Size]) T(static_cast<Args&&>(args)...);
+        return m_Data[m_Size++];
+    }
 
     void PushBack(const T& Value) {
         if (m_Size >= m_Capacity)
             Reserve(GrowCapacity(m_Size + 1));
-        m_Data[m_Size++] = Value;
+
+        new (&m_Data[m_Size]) T(Value);
+        ++m_Size;
+    }
+
+    void PushBack(T&& Value) {
+        if (m_Size >= m_Capacity)
+            Reserve(GrowCapacity(m_Size + 1));
+
+        new (&m_Data[m_Size]) T(static_cast<T&&>(Value));
+        ++m_Size;
     }
 
     void PopBack() {
-        if (m_Size > 0) --m_Size;
+        if (m_Size == 0)
+            return;
+
+        --m_Size;
+
+        if constexpr (destruct)
+            m_Data[m_Size].~T();
     }
 
     void Erase(u32 Index) {
-        if (Index >= m_Size) return;
-        for (u32 I = Index; I < m_Size - 1; ++I)
-            m_Data[I] = m_Data[I + 1];
+        if (Index >= m_Size)
+            return;
+
+        if constexpr (destruct)
+            m_Data[Index].~T();
+
+        for (u32 i = Index; i < m_Size - 1; ++i) {
+            new (&m_Data[i]) T(Move(m_Data[i + 1]));
+
+            if constexpr (destruct)
+                m_Data[i + 1].~T();
+        }
+
         --m_Size;
+    }
+
+    void Erase(u32 FirstIndex, u32 LastIndex) {
+        if (FirstIndex >= m_Size || LastIndex > m_Size || FirstIndex >= LastIndex)
+            return;
+
+        u32 Count = LastIndex - FirstIndex;
+
+        if constexpr (destruct) {
+            for (u32 i = FirstIndex; i < LastIndex; ++i)
+                m_Data[i].~T();
+        }
+
+        for (u32 i = FirstIndex; i + Count < m_Size; ++i) {
+            new (&m_Data[i]) T(Move(m_Data[i + Count]));
+
+            if constexpr (destruct)
+                m_Data[i + Count].~T();
+        }
+
+        m_Size -= Count;
+    }
+
+    T* Erase(T* Pos) {
+        if (Pos < begin() || Pos >= end())
+            return end();
+
+        u32 Index = static_cast<u32>(Pos - m_Data);
+        Erase(Index);
+
+        return m_Data + Index;
+    }
+
+    T* Erase(T* First, T* Last) {
+        if (First < begin() || Last > end() || First >= Last)
+            return end();
+
+        u32 FirstIndex = static_cast<u32>(First - m_Data);
+        u32 LastIndex = static_cast<u32>(Last - m_Data);
+
+        Erase(FirstIndex, LastIndex);
+
+        return m_Data + FirstIndex;
     }
 
     T& operator[](u32 Index) { return m_Data[Index]; }
@@ -284,11 +564,11 @@ public:
     inline T* Data() { return m_Data; }
     inline const T* Data() const { return m_Data; }
 
-    inline T* Begin() { return m_Data; }
-    inline const T* Begin() const { return m_Data; }
+    inline T* begin() { return m_Data; }
+    inline const T* begin() const { return m_Data; }
 
-    inline T* End() { return &m_Data[m_Size]; }
-    inline const T* End() const { return &m_Data[m_Size]; }
+    inline T* end() { return &m_Data[m_Size]; }
+    inline const T* end() const { return &m_Data[m_Size]; }
 
     constexpr u32 Size() const { return m_Size; }
     constexpr u32 Capacity() const { return m_Capacity; }
@@ -438,6 +718,20 @@ constexpr inline T Min(T x, T y) {
 template<typename T>
 constexpr inline T Max(T x, T y) {
     return x > y ? x : y;
+}
+
+template<typename T>
+constexpr T Log2(T value) {
+    if (value == 0) {
+        return 0;
+    }
+
+    T result{ 0 };
+    while (value >>= 1) {
+        ++result;
+    }
+
+    return result;
 }
 
 template <typename V, int N>

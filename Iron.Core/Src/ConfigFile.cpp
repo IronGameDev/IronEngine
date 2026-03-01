@@ -6,27 +6,6 @@
 
 namespace Iron {
 namespace {
-static char* StrDup(const char* S) {
-    if (!S) return nullptr;
-    size_t Len{ StrLen(S) + 1 };
-    char* Out = (char*)MemAlloc(Len);
-    if (!Out) return nullptr;
-    memcpy(Out, S, Len);
-    return Out;
-}
-
-static char* Trim(char* Str) {
-    if (!Str) return nullptr;
-
-    while (isspace(*Str)) ++Str;
-
-    char* End{ Str + strlen(Str) };
-    while (End > Str && isspace(*(End - 1))) --End;
-    *End = '\0';
-
-    return Str;
-}
-
 static void ParseLine(ConfigFile& Cfg, char* Line, char*& CurrentSection) {
     Line = Trim(Line);
     if (!Line || *Line == '\0')

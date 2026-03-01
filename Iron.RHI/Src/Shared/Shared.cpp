@@ -178,8 +178,8 @@ CRHIFactory::CreateDevice(IRHIAdapter* const adapter,
     switch (info.Backend)
     {
     case RHIBackend::DirectX11: {
-        D3D11::CRHIDevice_DX11* temp{ nullptr };
-        //D3D11::CRHIDevice_DX11* temp{ new D3D11::CRHIDevice_DX11(adapter, info) };
+        //D3D11::CRHIDevice_DX11* temp{ nullptr };
+        D3D11::CRHIDevice_DX11* temp{ new D3D11::CRHIDevice_DX11(this, adapter, info) };
         if (!temp) {
             return Result::ENomemory;
         }

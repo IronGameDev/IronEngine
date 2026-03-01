@@ -25,6 +25,7 @@ constexpr static const char* g_Errors[Result::Count]{
     "ENointerface",
     "ELoadIcon",
     "ECreateRHIObject",
+    "ECreateResource",
     "ENotInitialized",
 };
 

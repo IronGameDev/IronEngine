@@ -25,7 +25,8 @@ GetExePath()
 EngineContext g_Context{};
 
 EngineContext::EngineContext()
-    : m_LogEnableDebug(true),
+    :
+    m_LogEnableDebug(true),
     m_LogEnableInfo(true),
     m_LogEnableWarning(true),
     m_LogEnableError(true),
@@ -57,6 +58,8 @@ EngineContext::EngineContext()
 }
 
 EngineContext::~EngineContext() {
+    SafeRelease(m_RenderContext);
+
     std::filesystem::path ConfigPath{ "D:\\code\\IronEngine\\" };
     ConfigPath.append("settings.ini");
     ConfigFile Config{};
@@ -88,15 +91,19 @@ EngineContext::Run(const EngineInitInfo& Info, Application* const App)
     }
 
     Result::Code Res{ Result::Ok };
+    m_RenderContext = new RenderContext(LoadAndGetFactory(
+        g_ModuleNames[EngineAPI::Renderer]));
+    if (!m_RenderContext) {
+        return Result::ENomemory;
+    }
+
+    if (Result::Fail(m_RenderContext->GetLastResult())) {
+        return m_RenderContext->GetLastResult();
+    }
 
     if (!m_Headless) {
         m_WindowFactory = (Window::IWindowFactory*)LoadAndGetFactory(
             g_ModuleNames[EngineAPI::Windowing]);
-        m_RenderContext = { LoadAndGetFactory(
-            g_ModuleNames[EngineAPI::Renderer]) };
-        if (Result::Fail(m_RenderContext.GetLastResult())) {
-            return m_RenderContext.GetLastResult();
-        }
 
         Res = App->PreInitialize();
         if (Result::Fail(Res)) {
@@ -119,6 +126,8 @@ EngineContext::Run(const EngineInitInfo& Info, Application* const App)
         m_MainWindow->SetBorderColor({ 0.2f, 0.2f, 0.2f });
         m_MainWindow->SetTitleColor({ 0.9f, 0.9f, 1.f });
         m_MainWindow->SetFullscreen(Info.Window.Fullscreen);
+
+        m_RenderContext->InitializeForWindow(m_MainWindow);
     }
 
     Res = App->PostInitialize();
@@ -148,6 +157,8 @@ EngineContext::Run(const EngineInitInfo& Info, Application* const App)
     if (!m_Headless) {
         SafeRelease(m_MainWindow);
     }
+
+    SafeRelease(m_RenderContext);
 
     return Result::Ok;
 }
@@ -179,7 +190,7 @@ EngineContext::GetEngineAPI(EngineAPI::Api Api) {
     case EngineAPI::Windowing:
         return m_WindowFactory;
     case EngineAPI::Renderer:
-        return m_RenderContext.GetFactory();
+        return m_RenderContext->GetFactory();
     case EngineAPI::Input:
     case EngineAPI::Audio:
     case EngineAPI::Filesystem:
