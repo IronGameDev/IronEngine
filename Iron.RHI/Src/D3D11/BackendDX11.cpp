@@ -312,6 +312,7 @@ CRHISurface_DX11::CRHISurface_DX11(
     const SurfaceInitInfo& info)
     : m_Swapchain(),
     m_Buffer(),
+    m_Rtv(),
     m_BufferCount(info.TripleBuffering ? 3 : 2),
     m_SupportTearing() {
     if (!(device && factory &&
@@ -322,6 +323,7 @@ CRHISurface_DX11::CRHISurface_DX11(
 
     const HWND hwnd{ (const HWND)info.Native };
     IDXGIFactory7* const dxgi{ (IDXGIFactory7* const)factory->GetNative() };
+    ID3D11Device5* const d3d11{ (ID3D11Device5* const)device->GetNative() };
     m_SupportTearing = factory->SupportsTearing() && info.AllowTearing;
 
     DXGI_SWAP_CHAIN_DESC1 swap_desc{};
@@ -341,7 +343,7 @@ CRHISurface_DX11::CRHISurface_DX11(
 
     HRESULT hr{ S_OK };
     hr = dxgi->CreateSwapChainForHwnd(
-        (IUnknown*)device->GetNative(),
+        d3d11,
         hwnd,
         &swap_desc,
         nullptr,
@@ -356,14 +358,21 @@ CRHISurface_DX11::CRHISurface_DX11(
     temp->QueryInterface(IID_PPV_ARGS(&m_Swapchain));
 
     m_Swapchain->GetBuffer(0, IID_PPV_ARGS(&m_Buffer));
+    d3d11->CreateRenderTargetView1(m_Buffer, nullptr, &m_Rtv);
 }
 
 void
 CRHISurface_DX11::Release() {
+    SafeRelease(m_Rtv);
     SafeRelease(m_Buffer);
     SafeRelease(m_Swapchain);
 
     delete this;
+}
+
+void
+CRHISurface_DX11::Present(bool vsync) {
+    m_Swapchain->Present(vsync ? 1 : 0, vsync ? 0 : DXGI_PRESENT_ALLOW_TEARING);
 }
 
 u32
@@ -376,6 +385,12 @@ CRHISurface_DX11::GetNative() const {
     return m_Swapchain;
 }
 
+void* const
+CRHISurface_DX11::GetNativeBuffer(u32 index) const {
+    UNREFERENCED_PARAMETER(index);
+    return m_Buffer;
+}
+
 Result::Code
 CRHIFrameGraph_DX11::Initialize(
     CRHIDevice_DX11* const device,
@@ -385,6 +400,8 @@ CRHIFrameGraph_DX11::Initialize(
     if ((u32)(flags & FGCompileFlags::LogInfo)) {
         PrintDependencies(dependencies);
     }
+
+    m_Ctx = device->GetContext();
 
     ID3D11Device5* const d3d11{ (ID3D11Device5* const)device->GetNative() };
     const Vector<u32> sorted{ TopologicalSort(dependencies) };
@@ -424,6 +441,14 @@ CRHIFrameGraph_DX11::Initialize(
                 m_DescResources[i] = res;
 
                 num_buffers += info.TemporalCount;
+            }
+            else if (info.Type == FGResourceType::Swapchain) {
+                Resource res{};
+                res.Start = 0;
+                res.Count = (u16)info.TemporalCount;
+                res.Type = CompiledType::Swapchain;
+
+                m_DescResources[i] = res;
             }
         }
 
@@ -478,91 +503,226 @@ CRHIFrameGraph_DX11::Initialize(
             }
         }
     }
-    {//View creation
-        using namespace Shared;
-        std::unordered_map<ViewCacheEntry, u32, ViewCacheHasher> view_cache;
+    using namespace Shared;
+    std::unordered_map<ViewCacheEntry, u32, ViewCacheHasher> view_cache;
 
-        for (u32 i{ 0 }; i < (u32)m_Passes.Size(); ++i) {
-            const RHIGraphBuilder::FGPassDesc& pass_desc{ passes[i] };
-            Pass& compiled{ m_Passes[i] };
+    for (u32 i{ 0 }; i < (u32)m_Passes.Size(); ++i) {
+        const RHIGraphBuilder::FGPassDesc& pass_desc{ passes[i] };
+        Pass& compiled{ m_Passes[i] };
 
-            for (u32 j{ 0 }; j < (u32)pass_desc.Reads.Size(); ++j) {
-                const auto& read{ pass_desc.Reads[j] };
-                const Resource& resource{ m_DescResources[read.Resource] };
+        for (u32 j{ 0 }; j < (u32)pass_desc.Reads.Size(); ++j) {
+            const auto& read{ pass_desc.Reads[j] };
+            const u32 slot{ read.Slot };
+            const Resource& resource{ m_DescResources[read.Resource] };
 
-                
-                /*ViewCacheEntry entry{};
-                entry.Resource = read.Resource;
-                entry.Format = read.ViewFormat;
-                entry.BaseMip = read.Range.BaseMip;
-                entry.MipCount = read.Range.MipCount;
-                entry.BaseLayer = read.Range.BaseLayer;
-                entry.LayerCount = read.Range.LayerCount;
-                entry.Plane = read.Range.Plane;
-
-                auto it = view_cache.find(entry);
-                if (it == view_cache.end()) {
-                    if (read.State & ResourceState::PixelResource
-                        || read.State & ResourceState::NonPixelResource) {
-                        View view{};
-                        view.Resource = entry.Resource;
-                        view.Type = ViewType::ShaderResource;
-                        view.Index = m_SrvHeap.Size();
-
-                        D3D11_SHADER_RESOURCE_VIEW_DESC1 srv_desc{};
-                        srv_desc.Format = ConvertFormat(entry.Format);
-                        srv_desc.ViewDimension = D3D10_1_SRV_DIMENSION_TEXTURE2D;
-                        srv_desc.Texture2D.MipLevels = entry.MipCount;
-                        srv_desc.Texture2D.MostDetailedMip = entry.BaseMip;
-                        srv_desc.Texture2D.PlaneSlice = entry.Plane;
-
-                        ID3D11ShaderResourceView* srv{ nullptr };
-                        HRESULT hr{ S_OK };
-                        hr = d3d11->CreateShaderResourceView1();
-
-                        view_cache[entry] = m_DescViews.Size();
-                        m_DescViews.EmplaceBack(view);
-                    }
-                    else if (read.State & ResourceState::DepthRead) {
-                        View view{};
-                        view.Resource = entry.Resource;
-                        view.Type = ViewType::DepthStencil;
-                        view.Index = dsv_count++;
-
-                        view_cache[entry] = m_DescViews.Size();
-                        m_DescViews.EmplaceBack(view);
-                    }
-                }*/
+            if (resource.Type == CompiledType::Swapchain) {
+                continue;
             }
 
-            for (u32 j{ 0 }; j < (u32)pass_desc.Writes.Size(); ++j) {
-                const auto& write{ pass_desc.Writes[j] };
-                ViewCacheEntry entry{};
-                entry.Resource = write.Resource;
-                entry.Format = write.ViewFormat;
-                entry.BaseMip = write.Range.BaseMip;
-                entry.MipCount = write.Range.MipCount;
-                entry.BaseLayer = write.Range.BaseLayer;
-                entry.LayerCount = write.Range.LayerCount;
-                entry.Plane = write.Range.Plane;
-                auto it = view_cache.find(entry);
-                if (it == view_cache.end()) {
-                    if (write.State & ResourceState::RenderTarget) {
-                        View view{};
-                        view.Resource = entry.Resource;
-                        view.Type = ViewType::RenderTarget;
-                        view.Index = rtv_count++;
+            ViewCacheEntry entry{};
+            entry.Resource = read.Resource;
+            entry.Format = read.ViewFormat;
+            entry.BaseMip = read.Range.BaseMip;
+            entry.MipCount = read.Range.MipCount;
+            entry.BaseLayer = read.Range.BaseLayer;
+            entry.LayerCount = read.Range.LayerCount;
+            entry.Plane = read.Range.Plane;
 
-                        m_DescViews.EmplaceBack(view);
-                    }
-                    else if (write.State & ResourceState::DepthWrite) {
-                        View view{};
-                        view.Resource = entry.Resource;
-                        view.Type = ViewType::DepthStencil;
-                        view.Index = dsv_count++;
+            auto it = view_cache.find(entry);
+            if (it == view_cache.end()) {
+                if (read.State & ResourceState::PixelResource
+                    || read.State & ResourceState::NonPixelResource) {
+                    View view{};
+                    view.Resource = (u16)entry.Resource;
+                    view.Type = ViewType::ShaderResource;
+                    view.BaseIndex = (u16)m_SrvHeap.Size();
 
-                        m_DescViews.EmplaceBack(view);
+                    D3D11_SHADER_RESOURCE_VIEW_DESC1 srv_desc{};
+                    srv_desc.Format = ConvertFormat(entry.Format);
+                    srv_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+                    srv_desc.Texture2D.MipLevels = entry.MipCount;
+                    srv_desc.Texture2D.MostDetailedMip = entry.BaseMip;
+                    srv_desc.Texture2D.PlaneSlice = entry.Plane;
+
+                    const u32 temporal{ resource.Count };
+                    HRESULT hr{ S_OK };
+
+                    for (u32 idx{ 0 }; idx < temporal; ++idx) {
+                        ID3D11Texture2D* const texture{ m_Texture2DHeap[resource.Start + idx] };
+
+                        ID3D11ShaderResourceView1* viewhandle{ nullptr };
+                        hr = d3d11->CreateShaderResourceView1(texture, &srv_desc, &viewhandle);
+                        if (FAILED(hr)) {
+                            return Result::ECreateView;
+                        }
+
+                        m_SrvHeap.PushBack(viewhandle);
                     }
+
+                    const u32 view_id{ m_DescViews.Size() };
+                    view_cache[entry] = view_id;
+                    m_DescViews.EmplaceBack(view);
+
+                    BoundView binding{};
+                    binding.View = (u16)view_id;
+                    binding.Slot = (u16)slot;
+                    compiled.Srvs.PushBack(binding);
+                }
+                else if (read.State & ResourceState::DepthRead) {
+                    View view{};
+                    view.Resource = (u16)entry.Resource;
+                    view.Type = ViewType::DepthStencil;
+                    view.BaseIndex = (u16)m_DsvHeap.Size();
+
+                    D3D11_DEPTH_STENCIL_VIEW_DESC dsv_desc{};
+                    dsv_desc.Format = ConvertFormat(entry.Format);
+                    dsv_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+                    dsv_desc.Texture2D.MipSlice = entry.BaseMip;
+
+                    const u32 temporal{ resource.Count };
+                    HRESULT hr{ S_OK };
+
+                    for (u32 idx{ 0 }; idx < temporal; ++idx) {
+                        ID3D11Texture2D* const texture{ m_Texture2DHeap[resource.Start + idx] };
+
+                        ID3D11DepthStencilView* viewhandle{ nullptr };
+                        hr = d3d11->CreateDepthStencilView(texture, &dsv_desc, &viewhandle);
+                        if (FAILED(hr)) {
+                            return Result::ECreateView;
+                        }
+
+                        m_DsvHeap.PushBack(viewhandle);
+                    }
+
+                    const u32 view_id{ m_DescViews.Size() };
+                    view_cache[entry] = view_id;
+                    m_DescViews.EmplaceBack(view);
+
+                    compiled.HasDsv = 1;
+                    compiled.Dsv.View = (u16)view_id;
+                    compiled.Dsv.Slot = 0;
+                }
+            }
+            else {
+                if (read.State & ResourceState::PixelResource
+                    || read.State & ResourceState::NonPixelResource) {
+                    BoundView binding{};
+                    binding.View = (u16)it->second;
+                    binding.Slot = (u16)slot;
+                    compiled.Srvs.PushBack(binding);
+                }
+                else if (read.State & ResourceState::DepthRead) {
+                    compiled.HasDsv = 1;
+                    compiled.Dsv.View = (u16)it->second;
+                    compiled.Dsv.Slot = (u16)slot;
+                }
+            }
+        }
+
+        for (u32 j{ 0 }; j < (u32)pass_desc.Writes.Size(); ++j) {
+            const auto& write{ pass_desc.Writes[j] };
+            const u32 slot{ write.Slot };
+            const Resource& resource{ m_DescResources[write.Resource] };
+
+            if (resource.Type == CompiledType::Swapchain) {
+                
+                compiled.NumRtvs++;
+                compiled.Rtvs[slot].Slot = (u16)slot;
+                compiled.Rtvs[slot].View = (u16)~0;
+                continue;
+            }
+
+            ViewCacheEntry entry{};
+            entry.Resource = write.Resource;
+            entry.Format = write.ViewFormat;
+            entry.BaseMip = write.Range.BaseMip;
+            entry.MipCount = write.Range.MipCount;
+            entry.BaseLayer = write.Range.BaseLayer;
+            entry.LayerCount = write.Range.LayerCount;
+            entry.Plane = write.Range.Plane;
+            auto it = view_cache.find(entry);
+            if (it == view_cache.end()) {
+                if (write.State & ResourceState::RenderTarget) {
+                    View view{};
+                    view.Resource = (u16)entry.Resource;
+                    view.Type = ViewType::RenderTarget;
+                    view.BaseIndex = (u16)m_RtvHeap.Size();
+
+                    D3D11_RENDER_TARGET_VIEW_DESC1 rtv_desc{};
+                    rtv_desc.Format = ConvertFormat(entry.Format);
+                    rtv_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+                    rtv_desc.Texture2D.MipSlice = entry.BaseMip;
+                    rtv_desc.Texture2D.PlaneSlice = entry.Plane;
+
+                    const u32 temporal{ resource.Count };
+                    HRESULT hr{ S_OK };
+
+                    for (u32 idx{ 0 }; idx < temporal; ++idx) {
+                        ID3D11Texture2D* const texture{ m_Texture2DHeap[resource.Start + idx] };
+
+                        ID3D11RenderTargetView1* viewhandle{ nullptr };
+                        hr = d3d11->CreateRenderTargetView1(texture, &rtv_desc, &viewhandle);
+                        if (FAILED(hr)) {
+                            return Result::ECreateView;
+                        }
+
+                        m_RtvHeap.PushBack(viewhandle);
+                    }
+
+                    const u32 view_id{ m_DescViews.Size() };
+
+                    view_cache[entry] = view_id;
+                    m_DescViews.EmplaceBack(view);
+
+                    compiled.NumRtvs++;
+                    compiled.Rtvs[slot].Slot = (u16)slot;
+                    compiled.Rtvs[slot].View = (u16)view_id;
+                }
+                else if (write.State & ResourceState::DepthWrite) {
+                    View view{};
+                    view.Resource = (u16)entry.Resource;
+                    view.Type = ViewType::DepthStencil;
+                    view.BaseIndex = (u16)m_DsvHeap.Size();
+
+                    D3D11_DEPTH_STENCIL_VIEW_DESC dsv_desc{};
+                    dsv_desc.Format = ConvertFormat(entry.Format);
+                    dsv_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+                    dsv_desc.Texture2D.MipSlice = entry.BaseMip;
+
+                    const u32 temporal{ resource.Count };
+                    HRESULT hr{ S_OK };
+
+                    for (u32 idx{ 0 }; idx < temporal; ++idx) {
+                        ID3D11Texture2D* const texture{ m_Texture2DHeap[resource.Start + idx] };
+
+                        ID3D11DepthStencilView* viewhandle{ nullptr };
+                        hr = d3d11->CreateDepthStencilView(texture, &dsv_desc, &viewhandle);
+                        if (FAILED(hr)) {
+                            return Result::ECreateView;
+                        }
+
+                        m_DsvHeap.PushBack(viewhandle);
+                    }
+
+                    const u32 view_id{ m_DescViews.Size() };
+                    view_cache[entry] = view_id;
+                    m_DescViews.EmplaceBack(view);
+
+                    compiled.HasDsv = 1;
+                    compiled.Dsv.View = (u16)view_id;
+                    compiled.Dsv.Slot = 0;
+                }
+            }
+            else {
+                if (write.State & ResourceState::RenderTarget) {
+                    compiled.NumRtvs++;
+                    compiled.Rtvs[slot].Slot = (u16)slot;
+                    compiled.Rtvs[slot].View = (u16)it->second;
+                }
+                else if (write.State & ResourceState::DepthRead) {
+                    compiled.HasDsv = 1;
+                    compiled.Dsv.View = (u16)it->second;
+                    compiled.Dsv.Slot = (u16)write.Slot;
                 }
             }
         }
@@ -573,13 +733,56 @@ CRHIFrameGraph_DX11::Initialize(
 
 void
 CRHIFrameGraph_DX11::Release() {
-    for (auto& res : m_Texture2DHeap) {
-        SafeRelease(res);
-    }
+    for (auto& res : m_Texture2DHeap) SafeRelease(res);
+    for (auto& res : m_SrvHeap) SafeRelease(res);
+    for (auto& res : m_RtvHeap) SafeRelease(res);
+    for (auto& res : m_DsvHeap) SafeRelease(res);
 }
 
 void
-CRHIFrameGraph_DX11::Execute() {
+CRHIFrameGraph_DX11::Execute(
+    IRHISurface* const surface,
+    u64 frameNumber) {
+    CRHISurface_DX11* const dx_surface{ (CRHISurface_DX11* const)surface };
+
+    ID3D11DeviceContext4* const ctx{ m_Ctx };
+
+    for (auto& pass : m_Passes) {
+        const u32 num_rtvs{ pass.NumRtvs };
+        const bool has_dsv{ (bool)pass.HasDsv };
+        
+        ID3D11RenderTargetView* targets[RHI_MAX_TARGET_COUNT]{};
+        ID3D11DepthStencilView* depth{ nullptr };
+
+        for (u16 i{ 0 }; i < num_rtvs; ++i) {
+            const u16 view_handle{ pass.Rtvs[i].View };
+            if (view_handle == (u16)~0) {
+                targets[i] = dx_surface->GetRtv();
+                continue;
+            }
+
+            const View& view_desc{ m_DescViews[view_handle] };
+            const Resource& resource{ m_DescResources[view_desc.Resource] };
+
+            const u32 actual_index{ CalculateTemporal(frameNumber, view_desc.BaseIndex, resource.Count) };
+
+            targets[i] = m_RtvHeap[actual_index];
+        }
+
+        if (has_dsv) {
+            const u16 view_handle{ pass.Dsv.View };
+            const View& view_desc{ m_DescViews[view_handle] };
+            const Resource& resource{ m_DescResources[view_desc.Resource] };
+
+            const u32 actual_index{ CalculateTemporal(frameNumber, view_desc.BaseIndex, resource.Count) };
+
+            depth = m_DsvHeap[actual_index];
+        }
+
+        ctx->OMSetRenderTargets(num_rtvs, &targets[0], depth);
+    }
+
+    dx_surface->Present();
 }
 
 Vector<Vector<u32>>

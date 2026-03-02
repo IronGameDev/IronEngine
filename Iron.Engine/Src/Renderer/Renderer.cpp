@@ -41,24 +41,24 @@ SetupRenderer(RHIGraphBuilder& builder) {
     );
 
     builder.BeginPass("DepthPrePass", RenderStuff);
-    builder.Write(depth, RHIFormat::D32_FLOAT, ResourceState::DepthWrite);
+    builder.Write(depth, RHIFormat::D32_FLOAT, ResourceState::DepthWrite, 0);
     builder.EndPass();
 
     builder.BeginPass("SSAOPass", RenderStuff);
-    builder.Read(depth, RHIFormat::R32_FLOAT, ResourceState::NonPixelResource);
-    builder.Write(ssao, RHIFormat::R8_UNORM, ResourceState::RenderTarget);
+    builder.Read(depth, RHIFormat::R32_FLOAT, ResourceState::NonPixelResource, 0);
+    builder.Write(ssao, RHIFormat::R8_UNORM, ResourceState::RenderTarget, 0);
     builder.EndPass();
 
     builder.BeginPass("ColorPass", RenderStuff);
-    builder.Read(depth, RHIFormat::D32_FLOAT, ResourceState::DepthRead);
-    builder.Read(ssao, RHIFormat::R8_UNORM, ResourceState::PixelResource);
-    builder.Write(color, RHIFormat::R8G8B8A8_UNORM, ResourceState::RenderTarget);
+    builder.Read(depth, RHIFormat::D32_FLOAT, ResourceState::DepthRead, 0);
+    builder.Read(ssao, RHIFormat::R8_UNORM, ResourceState::PixelResource, 0);
+    builder.Write(color, RHIFormat::R8G8B8A8_UNORM, ResourceState::RenderTarget, 0);
     builder.EndPass();
 
     builder.BeginPass("PostProcess", RenderStuff);
-    builder.Read(depth, RHIFormat::R32_FLOAT, ResourceState::PixelResource);
-    builder.Read(color, RHIFormat::R8G8B8A8_UNORM, ResourceState::PixelResource);
-    builder.WriteClear(bb, RHIFormat::R8G8B8A8_UNORM_SRGB, ResourceState::RenderTarget, { 1.f, 0.f, 0.f, 1.f });
+    builder.Read(depth, RHIFormat::R32_FLOAT, ResourceState::PixelResource, 0);
+    builder.Read(color, RHIFormat::R8G8B8A8_UNORM, ResourceState::PixelResource, 1);
+    builder.WriteClear(bb, RHIFormat::R8G8B8A8_UNORM_SRGB, ResourceState::RenderTarget, 0, { 1.f, 0.f, 0.f, 1.f });
     builder.EndPass();
 }
 }//anonymous namespace
@@ -195,5 +195,12 @@ RenderContext::Release() {
     SafeRelease(m_Device);
 
     delete this;
+}
+
+Result::Code
+RenderContext::RenderFrame(u64 frameNumber) {
+    m_FrameGraph->Execute(m_Surface, frameNumber);
+
+    return Result::Ok;
 }
 }

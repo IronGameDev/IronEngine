@@ -5,7 +5,7 @@
 #define RHI_VIEW_INDEX_BITS 12
 #define RHI_MAX_NAME 128
 #define RHI_MAX_TEMPORAL 1 << RHI_TEMPORAL_COUNT_BITS
-#define RHI_MAX_VIEWS_PER_TYPE 1 << RHI_VIEW_INDEX_BITS
+#define RHI_MAX_VIEWS_PER_TYPE (1 << RHI_VIEW_INDEX_BITS) - 1
 #define RHI_MAX_TARGET_COUNT 8
 
 #ifndef RHI_ENABLE_STREAM_CHECK
@@ -459,13 +459,16 @@ public:
 
     virtual u32 GetBufferCount() const = 0;
     virtual void* const GetNative() const = 0;
+    virtual void* const GetNativeBuffer(u32 index) const = 0;
 };
 
 class IRHIFrameGraph : public IObjectBase {
 public:
     virtual ~IRHIFrameGraph() = default;
 
-    virtual void Execute() = 0;
+    virtual void Execute(
+        IRHISurface* const surface,
+        u64 frameNumber) = 0;
 };
 
 class RHIGraphBuilder {
@@ -482,6 +485,7 @@ public:
         ResourceState::State            State;
         RHIFormat::Fmt                  ViewFormat;
         SubresourceRange                Range;
+        u32                             Slot;
         FGClearOp::Op                   ClearOp{ FGClearOp::None };
         ClearValue                      ClearValue;
     };
@@ -563,10 +567,11 @@ public:
         FGResource          resource,
         RHIFormat::Fmt      viewFormat,
         u32                 state,
+        u32                 slot,
         SubresourceRange    range = {}) {
         ValidatePass();
         AddFlags(resource, (ResourceState::State)state);
-        const FGResourceUsage usage{ resource, (ResourceState::State)state, viewFormat, range };
+        const FGResourceUsage usage{ resource, (ResourceState::State)state, viewFormat, range, slot };
         m_Passes[m_CurrentPass].Reads.PushBack(usage);
     }
 
@@ -574,10 +579,11 @@ public:
         FGResource          resource,
         RHIFormat::Fmt      viewFormat,
         u32                 state,
+        u32                 slot,
         SubresourceRange    range = {}) {
         ValidatePass();
         AddFlags(resource, (ResourceState::State)state);
-        const FGResourceUsage usage{ resource, (ResourceState::State)state, viewFormat, range };
+        const FGResourceUsage usage{ resource, (ResourceState::State)state, viewFormat, range, slot };
         m_Passes[m_CurrentPass].Writes.PushBack(usage);
     }
 
@@ -585,11 +591,12 @@ public:
         FGResource          resource,
         RHIFormat::Fmt      viewFormat,
         u32                 state,
+        u32                 slot,
         ClearValue          clear,
         SubresourceRange    range = {}) {
         ValidatePass();
         AddFlags(resource, (ResourceState::State)state);
-        const FGResourceUsage usage{ resource, (ResourceState::State)state, viewFormat, range,
+        const FGResourceUsage usage{ resource, (ResourceState::State)state, viewFormat, range, slot,
         FmtIsDepth(viewFormat)
                         ? FGClearOp::DepthStencil
                         : FGClearOp::RenderTarget,
@@ -601,11 +608,12 @@ public:
         FGResource          resource,
         RHIFormat::Fmt      viewFormat,
         u32                 state,
+        u32                 slot,
         SubresourceRange    range = {}) {
         ValidatePass();
         AddFlags(resource, (ResourceState::State)state);
         m_Passes[m_CurrentPass].Writes.PushBack(
-            { resource, (ResourceState::State)state, viewFormat, range });
+            { resource, (ResourceState::State)state, viewFormat, range, slot });
     }
 
     const Vector<FGPassDesc>& GetPasses() const {

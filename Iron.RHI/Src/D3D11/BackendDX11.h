@@ -71,31 +71,41 @@ public:
 
     void Release() override;
 
+    void Present(bool vsync = true);
+
     u32 GetBufferCount() const override;
     void* const GetNative() const override;
+    void* const GetNativeBuffer(u32 index) const override;
+
+    ID3D11RenderTargetView1* const GetRtv() const {
+        return m_Rtv;
+    }
 
 private:
-    IDXGISwapChain4*    m_Swapchain;
-    ID3D11Texture2D*    m_Buffer;
-    u32                 m_BufferCount;
-    bool                m_SupportTearing;
+    IDXGISwapChain4*            m_Swapchain;
+    ID3D11Texture2D*            m_Buffer;
+    ID3D11RenderTargetView1*    m_Rtv;
+    u32                         m_BufferCount;
+    bool                        m_SupportTearing;
 };
 
+//TODO: Slot binding
 class CRHIFrameGraph_DX11 : public IRHIFrameGraph {
     struct CompiledType {
         enum Type : u16 {
-            Undefined = 0x00,
-            Texture = 0x01,
-            Buffer = 0x02,
+            Undefined = 0,
+            Texture,
+            Buffer,
+            Swapchain,
         };
     };
 
     struct ViewType {
         enum Type : u16 {
-            ShaderResource = 0x00,
-            RenderTarget = 1,
-            DepthStencil = 2,
-            UnorderedAccess = 3,
+            ShaderResource = 0,
+            RenderTarget,
+            DepthStencil,
+            UnorderedAccess,
         };
     };
 
@@ -108,7 +118,12 @@ class CRHIFrameGraph_DX11 : public IRHIFrameGraph {
     struct View {
         u16     Resource;
         u16     Type : 4;
-        u16     Index : RHI_VIEW_INDEX_BITS;
+        u16     BaseIndex : RHI_VIEW_INDEX_BITS;
+    };
+
+    struct BoundView {
+        u16     View;
+        u16     Slot;
     };
 
     struct Pass {
@@ -116,8 +131,8 @@ class CRHIFrameGraph_DX11 : public IRHIFrameGraph {
         u16                     HasDsv : 1{};
         u16                     ClearedBinds : 4{};
 
-        ID3D11RenderTargetView* Rtvs[RHI_MAX_TARGET_COUNT]{};
-        ID3D11DepthStencilView* Dsv{};
+        BoundView               Rtvs[RHI_MAX_TARGET_COUNT]{};
+        BoundView               Dsv{};
         Math::V3                RtvClearValues[RHI_MAX_TARGET_COUNT]{};
         struct {
             f32                 Depth{};
@@ -125,7 +140,7 @@ class CRHIFrameGraph_DX11 : public IRHIFrameGraph {
         } DepthClearValue;
 
         //TODO: Replace with stream and offset
-        Vector<u32>             Srvs{};
+        Vector<BoundView>       Srvs{};
 
         FGPassFunc              Func{};
     };
@@ -140,20 +155,29 @@ public:
 
     void Release() override;
 
-    void Execute() override;
+    void Execute(
+        IRHISurface* const surface,
+        u64 frameNumber) override;
 
 private:
     Vector<Vector<u32>> GetDependencies(const RHIGraphBuilder& builder) const;
     Vector<u32> TopologicalSort(const Vector<Vector<u32>>& dependencies) const;
     void PrintDependencies(const Vector<Vector<u32>>& dependencies) const;
 
+    inline u32 CalculateTemporal(u64 frameNumber, u32 start, u32 count) {
+        return start + (u32)(frameNumber % (u64)count);
+    }
+
 private:
     Vector<Pass>                        m_Passes;
     Vector<Resource>                    m_DescResources;
     Vector<View>                        m_DescViews;
     Vector<ID3D11Texture2D*>            m_Texture2DHeap;
-    Vector<ID3D11ShaderResourceView*>   m_SrvHeap;
-    Vector<ID3D11RenderTargetView*>     m_RtvHeap;
+    Vector<ID3D11ShaderResourceView1*>  m_SrvHeap;
+    Vector<ID3D11RenderTargetView1*>    m_RtvHeap;
     Vector<ID3D11DepthStencilView*>     m_DsvHeap;
+    
+    //TODO: FIX TS
+    ID3D11DeviceContext4*               m_Ctx;
 };
 }

@@ -29,6 +29,7 @@ public:
     RenderContext*              m_RenderContext{};
 
     std::atomic<bool>           m_Running{};
+    u64                         m_FrameNumber{};
 
 public:
     IObjectBase* const LoadAndGetFactory(const char* DllName);

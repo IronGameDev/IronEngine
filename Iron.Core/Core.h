@@ -96,6 +96,7 @@ struct Result {
         ELoadIcon,
         ECreateRHIObject,
         ECreateResource,
+        ECreateView,
         ENotInitialized,
 
         Count,

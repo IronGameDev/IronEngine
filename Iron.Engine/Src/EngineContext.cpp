@@ -146,6 +146,9 @@ EngineContext::Run(const EngineInitInfo& Info, Application* const App)
             m_Running = false;
         }
 
+        m_RenderContext->RenderFrame(m_FrameNumber);
+        ++m_FrameNumber;
+
         if (GetAsyncKeyState(VK_F1)) {
             m_MainWindow->SetFullscreen(!m_MainWindow->IsFullscreen());
             Sleep(200);

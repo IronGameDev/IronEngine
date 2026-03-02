@@ -12,6 +12,8 @@ public:
 
     void Release();
 
+    Result::Code RenderFrame(u64 frameNumber);
+
     constexpr Result::Code GetLastResult() const {
         return m_Error;
     }

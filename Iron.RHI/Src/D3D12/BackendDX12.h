@@ -153,6 +153,7 @@ public:
 
     u32 GetBufferCount() const override;
     void* const GetNative() const override;
+    void* const GetNativeBuffer(u32 index) const override { return nullptr; }
 
 private:
     IDXGISwapChain4*    m_Swapchain;
