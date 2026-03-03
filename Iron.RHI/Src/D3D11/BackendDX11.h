@@ -133,7 +133,7 @@ class CRHIFrameGraph_DX11 : public IRHIFrameGraph {
 
         BoundView               Rtvs[RHI_MAX_TARGET_COUNT]{};
         BoundView               Dsv{};
-        Math::V3                RtvClearValues[RHI_MAX_TARGET_COUNT]{};
+        Math::V4                RtvClearValues[RHI_MAX_TARGET_COUNT]{};
         struct {
             f32                 Depth{};
             u8                  Stencil{};

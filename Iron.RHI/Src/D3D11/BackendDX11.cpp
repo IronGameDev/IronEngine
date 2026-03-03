@@ -632,6 +632,14 @@ CRHIFrameGraph_DX11::Initialize(
                 continue;
             }
 
+            if (write.ClearOp == FGClearOp::RenderTarget) {
+                compiled.RtvClearValues[slot] = write.ClearValue.Color;
+            }
+            else if (write.ClearOp == FGClearOp::DepthStencil) {
+                compiled.DepthClearValue.Depth = write.ClearValue.Depth.Depth;
+                compiled.DepthClearValue.Stencil = write.ClearValue.Depth.Stencil;
+            }
+
             ViewCacheEntry entry{};
             entry.Resource = write.Resource;
             entry.Format = write.ViewFormat;

@@ -812,11 +812,54 @@ struct VecBase<V, 3> {
     }
 };
 
+template <typename V>
+struct VecBase<V, 4> {
+    f32 X, Y, Z, W;
+
+    constexpr VecBase() noexcept : X(), Y(), Z(), W() {}
+    constexpr explicit VecBase(f32 Vv) noexcept : X(Vv), Y(Vv), Z(Vv), W(Vv) {}
+    constexpr VecBase(f32 X_, f32 Y_, f32 Z_, f32 W_) noexcept
+        : X(X_), Y(Y_), Z(Z_), W(W_) {
+    }
+
+    constexpr bool operator==(const V& O) const noexcept {
+        return X == O.X && Y == O.Y && Z == O.Z && W == O.W;
+    }
+
+    constexpr bool operator!=(const V& O) const noexcept {
+        return !(*this == O);
+    }
+
+    constexpr V& operator+=(const V& O) noexcept {
+        X += O.X; Y += O.Y; Z += O.Z; W += O.W;
+        return static_cast<V&>(*this);
+    }
+
+    constexpr V& operator-=(const V& O) noexcept {
+        X -= O.X; Y -= O.Y; Z -= O.Z; W -= O.W;
+        return static_cast<V&>(*this);
+    }
+
+    constexpr V& operator*=(f32 S) noexcept {
+        X *= S; Y *= S; Z *= S; W *= S;
+        return static_cast<V&>(*this);
+    }
+
+    constexpr V& operator/=(f32 S) noexcept {
+        X /= S; Y /= S; Z /= S; W /= S;
+        return static_cast<V&>(*this);
+    }
+};
+
 struct V2 : VecBase<V2, 2> {
     using VecBase::VecBase;
 };
 
 struct V3 : VecBase<V3, 3> {
+    using VecBase::VecBase;
+};
+
+struct V4 : VecBase<V4, 4> {
     using VecBase::VecBase;
 };
 
@@ -865,6 +908,10 @@ constexpr f32 Dot(const V3& A, const V3& B) noexcept {
     return A.X * B.X + A.Y * B.Y + A.Z * B.Z;
 }
 
+constexpr f32 Dot(const V4& A, const V4& B) noexcept {
+    return A.X * B.X + A.Y * B.Y + A.Z * B.Z + A.W * B.W;
+}
+
 constexpr f32 Cross(const V2& A, const V2& B) noexcept {
     return A.X * B.Y - A.Y * B.X;
 }
@@ -885,11 +932,19 @@ constexpr f32 LengthSq(const V3& Vv) noexcept {
     return Dot(Vv, Vv);
 }
 
+constexpr f32 LengthSq(const V4& Vv) noexcept {
+    return Dot(Vv, Vv);
+}
+
 inline f32 Length(const V2& Vv) noexcept {
     return SqrtF(LengthSq(Vv));
 }
 
 inline f32 Length(const V3& Vv) noexcept {
+    return SqrtF(LengthSq(Vv));
+}
+
+inline f32 Length(const V4& Vv) noexcept {
     return SqrtF(LengthSq(Vv));
 }
 
@@ -900,6 +955,12 @@ inline V2 Normalize(const V2& Vv) noexcept {
 }
 
 inline V3 Normalize(const V3& Vv) noexcept {
+    const f32 LenSq = LengthSq(Vv);
+    if (LenSq == 0.0f) return {};
+    return Vv / SqrtF(LenSq);
+}
+
+inline V4 Normalize(const V4& Vv) noexcept {
     const f32 LenSq = LengthSq(Vv);
     if (LenSq == 0.0f) return {};
     return Vv / SqrtF(LenSq);
@@ -917,6 +978,12 @@ constexpr V3 NormalizeConstexpr(const V3& Vv) noexcept {
     return Vv * ConstexprRsqrt(LenSq);
 }
 
+constexpr V4 NormalizeConstexpr(const V4& Vv) noexcept {
+    const f32 LenSq = LengthSq(Vv);
+    if (LenSq == 0.0f) return {};
+    return Vv * ConstexprRsqrt(LenSq);
+}
+
 constexpr V2 Xy(const V2& Vv) noexcept { return Vv; }
 constexpr V2 Yx(const V2& Vv) noexcept { return { Vv.Y, Vv.X }; }
 
@@ -928,11 +995,32 @@ constexpr V2 Yx(const V3& Vv) noexcept { return { Vv.Y, Vv.X }; }
 constexpr V2 Zx(const V3& Vv) noexcept { return { Vv.Z, Vv.X }; }
 constexpr V2 Zy(const V3& Vv) noexcept { return { Vv.Z, Vv.Y }; }
 
+constexpr V2 Xy(const V4& Vv) noexcept { return { Vv.X, Vv.Y }; }
+constexpr V2 Xz(const V4& Vv) noexcept { return { Vv.X, Vv.Z }; }
+constexpr V2 Xw(const V4& Vv) noexcept { return { Vv.X, Vv.W }; }
+
+constexpr V2 Yz(const V4& Vv) noexcept { return { Vv.Y, Vv.Z }; }
+constexpr V2 Yw(const V4& Vv) noexcept { return { Vv.Y, Vv.W }; }
+constexpr V2 Zw(const V4& Vv) noexcept { return { Vv.Z, Vv.W }; }
+
 constexpr V3 Xyz(const V3& Vv) noexcept { return Vv; }
 constexpr V3 Xzy(const V3& Vv) noexcept { return { Vv.X, Vv.Z, Vv.Y }; }
 constexpr V3 Yxz(const V3& Vv) noexcept { return { Vv.Y, Vv.X, Vv.Z }; }
+
 constexpr V3 Yzx(const V3& Vv) noexcept { return { Vv.Y, Vv.Z, Vv.X }; }
 constexpr V3 Zxy(const V3& Vv) noexcept { return { Vv.Z, Vv.X, Vv.Y }; }
 constexpr V3 Zyx(const V3& Vv) noexcept { return { Vv.Z, Vv.Y, Vv.X }; }
+
+constexpr V3 Xyz(const V4& Vv) noexcept { return { Vv.X, Vv.Y, Vv.Z }; }
+constexpr V3 Xyw(const V4& Vv) noexcept { return { Vv.X, Vv.Y, Vv.W }; }
+constexpr V3 Xzw(const V4& Vv) noexcept { return { Vv.X, Vv.Z, Vv.W }; }
+constexpr V3 Yzw(const V4& Vv) noexcept { return { Vv.Y, Vv.Z, Vv.W }; }
+
+constexpr V4 Xyzw(const V4& Vv) noexcept { return Vv; }
+constexpr V4 Xywz(const V4& Vv) noexcept { return { Vv.X, Vv.Y, Vv.W, Vv.Z }; }
+constexpr V4 Xzyw(const V4& Vv) noexcept { return { Vv.X, Vv.Z, Vv.Y, Vv.W }; }
+constexpr V4 Xzwy(const V4& Vv) noexcept { return { Vv.X, Vv.Z, Vv.W, Vv.Y }; }
+constexpr V4 Xwyz(const V4& Vv) noexcept { return { Vv.X, Vv.W, Vv.Y, Vv.Z }; }
+constexpr V4 Xwzy(const V4& Vv) noexcept { return { Vv.X, Vv.W, Vv.Z, Vv.Y }; }
 }//math namespace
 }//iron namespace
