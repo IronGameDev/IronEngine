@@ -129,7 +129,7 @@ class CRHIFrameGraph_DX11 : public IRHIFrameGraph {
     struct Pass {
         u16                     NumRtvs : 3{};
         u16                     HasDsv : 1{};
-        u16                     ClearedBinds : 4{};
+        u16                     ClearedBinds : (RHI_MAX_TARGET_COUNT + 1) {};
 
         BoundView               Rtvs[RHI_MAX_TARGET_COUNT]{};
         BoundView               Dsv{};
@@ -143,6 +143,22 @@ class CRHIFrameGraph_DX11 : public IRHIFrameGraph {
         Vector<BoundView>       Srvs{};
 
         FGPassFunc              Func{};
+
+        constexpr inline void EnableClearTarget(u16 slot) {
+            ClearedBinds |= (1 << (slot + 1));
+        }
+
+        constexpr inline void EnableClearDepth() {
+            ClearedBinds |= 0x1;
+        }
+
+        constexpr inline bool HasTargetClear(u16 slot) {
+            return ClearedBinds & (1 << (slot + 1));
+        }
+
+        constexpr inline bool HasDepthClear() {
+            return ClearedBinds & 0x1;
+        }
     };
 
 public:

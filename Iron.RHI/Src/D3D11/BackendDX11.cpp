@@ -624,20 +624,25 @@ CRHIFrameGraph_DX11::Initialize(
             const u32 slot{ write.Slot };
             const Resource& resource{ m_DescResources[write.Resource] };
 
-            if (resource.Type == CompiledType::Swapchain) {
-                
-                compiled.NumRtvs++;
-                compiled.Rtvs[slot].Slot = (u16)slot;
-                compiled.Rtvs[slot].View = (u16)~0;
-                continue;
-            }
-
             if (write.ClearOp == FGClearOp::RenderTarget) {
-                compiled.RtvClearValues[slot] = write.ClearValue.Color;
+                compiled.RtvClearValues[slot].X = write.ClearValue.Color[0];
+                compiled.RtvClearValues[slot].Y = write.ClearValue.Color[1];
+                compiled.RtvClearValues[slot].Z = write.ClearValue.Color[2];
+                compiled.RtvClearValues[slot].W = write.ClearValue.Color[3];
+                compiled.EnableClearTarget((u16)slot);
             }
             else if (write.ClearOp == FGClearOp::DepthStencil) {
                 compiled.DepthClearValue.Depth = write.ClearValue.Depth.Depth;
                 compiled.DepthClearValue.Stencil = write.ClearValue.Depth.Stencil;
+                compiled.EnableClearDepth();
+            }
+
+            if (resource.Type == CompiledType::Swapchain) {
+
+                compiled.NumRtvs++;
+                compiled.Rtvs[slot].Slot = (u16)slot;
+                compiled.Rtvs[slot].View = (u16)~0;
+                continue;
             }
 
             ViewCacheEntry entry{};
@@ -758,7 +763,7 @@ CRHIFrameGraph_DX11::Execute(
     for (auto& pass : m_Passes) {
         const u32 num_rtvs{ pass.NumRtvs };
         const bool has_dsv{ (bool)pass.HasDsv };
-        
+
         ID3D11RenderTargetView* targets[RHI_MAX_TARGET_COUNT]{};
         ID3D11DepthStencilView* depth{ nullptr };
 
@@ -766,15 +771,20 @@ CRHIFrameGraph_DX11::Execute(
             const u16 view_handle{ pass.Rtvs[i].View };
             if (view_handle == (u16)~0) {
                 targets[i] = dx_surface->GetRtv();
-                continue;
+            }
+            else {
+                const View& view_desc{ m_DescViews[view_handle] };
+                const Resource& resource{ m_DescResources[view_desc.Resource] };
+
+                const u32 actual_index{ CalculateTemporal(frameNumber, view_desc.BaseIndex, resource.Count) };
+
+                targets[i] = m_RtvHeap[actual_index];
             }
 
-            const View& view_desc{ m_DescViews[view_handle] };
-            const Resource& resource{ m_DescResources[view_desc.Resource] };
-
-            const u32 actual_index{ CalculateTemporal(frameNumber, view_desc.BaseIndex, resource.Count) };
-
-            targets[i] = m_RtvHeap[actual_index];
+            if (pass.HasTargetClear(i)) {
+                ctx->ClearRenderTargetView(targets[i],
+                    &pass.RtvClearValues[i].X);
+            }
         }
 
         if (has_dsv) {
@@ -785,6 +795,14 @@ CRHIFrameGraph_DX11::Execute(
             const u32 actual_index{ CalculateTemporal(frameNumber, view_desc.BaseIndex, resource.Count) };
 
             depth = m_DsvHeap[actual_index];
+            if (pass.HasDepthClear()) {
+
+                //TODO: Only depth or stencil???
+                ctx->ClearDepthStencilView(depth,
+                    D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
+                    pass.DepthClearValue.Depth,
+                    pass.DepthClearValue.Stencil);
+            }
         }
 
         ctx->OMSetRenderTargets(num_rtvs, &targets[0], depth);
