@@ -98,6 +98,7 @@ struct Result {
         ECreateResource,
         ECreateView,
         ENotInitialized,
+        EFrameGraph,
 
         Count,
     };
@@ -222,16 +223,6 @@ constexpr static inline char* Trim(char* Str) {
     *End = '\0';
 
     return Str;
-}
-
-template<typename T>
-constexpr static inline T MinT(T X, T Y) {
-    return X < Y ? X : Y;
-}
-
-template<typename T>
-constexpr static inline T MaxT(T X, T Y) {
-    return X > Y ? X : Y;
 }
 
 class IObjectBase {
@@ -562,6 +553,9 @@ public:
     T& operator[](u32 Index) { return m_Data[Index]; }
     const T& operator[](u32 Index) const { return m_Data[Index]; }
 
+    T& Back() { return m_Data[m_Size - 1]; }
+    const T& Back() const { return m_Data[m_Size - 1]; }
+
     inline T* Data() { return m_Data; }
     inline const T* Data() const { return m_Data; }
 
@@ -707,7 +701,8 @@ constexpr f32 ConstexprRsqrt(f32 X) noexcept {
     return Y;
 }
 
-constexpr inline u32 AlignUp(u32 v, u32 a) {
+template<typename T>
+constexpr inline T AlignUp(T v, T a) {
     return (v + (a - 1)) & ~(a - 1);
 }
 

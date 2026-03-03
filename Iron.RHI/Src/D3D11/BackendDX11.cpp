@@ -396,6 +396,10 @@ CRHIFrameGraph_DX11::Initialize(
     CRHIDevice_DX11* const device,
     u32 flags,
     const RHIGraphBuilder& builder) {
+    if (!device) {
+        return Result::ENullptr;
+    }
+
     const Vector<Vector<u32>> dependencies{ GetDependencies(builder) };
     if ((u32)(flags & FGCompileFlags::LogInfo)) {
         PrintDependencies(dependencies);

@@ -256,7 +256,10 @@ struct FGCompileFlags {
 struct DeviceInitInfo {
     RHIBackend::Value   Backend;
     bool                Debug;
+
+    //Disabling the GPU timeout is only guaranteed for non-framegraph workloads.
     bool                DisableGPUTimeout;
+    u32                 MaxShaderResources;
 };
 
 struct ResourceInitInfo {
@@ -624,23 +627,34 @@ public:
         return m_Resources;
     }
 
+    const u32 GetSRViewCounter() const { return m_NumSrvs; }
+    const u32 GetRTViewCounter() const { return m_NumRtvs; }
+    const u32 GetDSViewCounter() const { return m_NumDsvs; }
+    const u32 GetUAViewCounter() const { return m_NumUavs; }
+
 private:
     void AddFlags(FGResource resource, ResourceState::State state) {
-        m_Resources[resource].Last_State = state;
+        FGResourceInitInfo& info{ m_Resources[resource] };
+
+        info.Last_State = state;
 
         if (state & ResourceState::RenderTarget) {
-            m_Resources[resource].Flag_Field |= ResourceFlag_RTV;
+            info.Flag_Field |= ResourceFlag_RTV;
+            m_NumRtvs += info.TemporalCount;
         }
         if (state & ResourceState::DepthRead
             || state & ResourceState::DepthWrite) {
-            m_Resources[resource].Flag_Field |= ResourceFlag_DSV;
+            info.Flag_Field |= ResourceFlag_DSV;
+            m_NumDsvs += info.TemporalCount;
         }
         if (state & ResourceState::PixelResource
             || state & ResourceState::NonPixelResource) {
-            m_Resources[resource].Flag_Field |= ResourceFlag_SRV;
+            info.Flag_Field |= ResourceFlag_SRV;
+            m_NumSrvs += info.TemporalCount;
         }
         if (state & ResourceState::UnorderedAccess) {
-            m_Resources[resource].Flag_Field |= ResourceFlag_UAV;
+            info.Flag_Field |= ResourceFlag_UAV;
+            m_NumUavs += info.TemporalCount;
         }
     }
 
@@ -664,6 +678,10 @@ private:
     Vector<FGPassDesc>          m_Passes{};
     Vector<FGResourceInitInfo>  m_Resources{};
 
+    u32                         m_NumSrvs{};
+    u32                         m_NumRtvs{};
+    u32                         m_NumDsvs{};
+    u32                         m_NumUavs{};
     u32                         m_CurrentPass{ InvalidPass };
     bool                        m_BuildingPass{ false };
 };
@@ -748,7 +766,7 @@ public:
         const u32 total{
             (alignedOffset - m_Offset) +
             sizeof(CmdHeader) +
-            Math::AlignUp(sizeof(T), payloadAlign) };
+            Math::AlignUp((u32)sizeof(T), payloadAlign) };
 
         if (!m_Stream || alignedOffset + total > m_Capacity)
         {

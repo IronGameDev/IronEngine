@@ -4,6 +4,9 @@
 #include <wrl.h>
 #include <format>
 #include <cassert>
+#include <unordered_map>
+#include <algorithm>
+#include <queue>
 
 using Microsoft::WRL::ComPtr;
 
@@ -43,11 +46,42 @@ ConvertResourceDimension(ResourceDimension::Dim dim) {
     }
 }
 
+constexpr D3D12_RESOURCE_DIMENSION
+ConvertResourceDimension(FGResourceType::Type type) {
+    return type == FGResourceType::Texture
+        ? D3D12_RESOURCE_DIMENSION_TEXTURE2D
+        : (type == FGResourceType::Buffer)
+        ? D3D12_RESOURCE_DIMENSION_BUFFER
+        : D3D12_RESOURCE_DIMENSION_UNKNOWN;
+}
+
 constexpr D3D12_RESOURCE_FLAGS
 ConvertResourceFlags(ResourceFlags::Flags flags) {
     D3D12_RESOURCE_FLAGS value{};
     if (!(flags & ResourceFlags::AllowShaderResource)) value |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
     return value;
+}
+
+
+constexpr static D3D12_RESOURCE_STATES
+ConvertResourceStates(ResourceState::State state)
+{
+    D3D12_RESOURCE_STATES val{};
+    if (state & ResourceState::VertexBuffer) val |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+    if (state & ResourceState::IndexBuffer) val |= D3D12_RESOURCE_STATE_INDEX_BUFFER;
+    if (state & ResourceState::ConstantBuffer) val |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+    if (state & ResourceState::RenderTarget) val |= D3D12_RESOURCE_STATE_RENDER_TARGET;
+    if (state & ResourceState::UnorderedAccess) val |= D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+    if (state & ResourceState::DepthRead) val |= D3D12_RESOURCE_STATE_DEPTH_READ;
+    if (state & ResourceState::DepthWrite) val |= D3D12_RESOURCE_STATE_DEPTH_WRITE;
+    if (state & ResourceState::PixelResource) val |= D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    if (state & ResourceState::NonPixelResource) val |= D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    if (state & ResourceState::IndirectArgs) val |= D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
+    if (state & ResourceState::CopyDest) val |= D3D12_RESOURCE_STATE_COPY_DEST;
+    if (state & ResourceState::CopySrc) val |= D3D12_RESOURCE_STATE_COPY_SOURCE;
+    if (state & ResourceState::Present) val |= D3D12_RESOURCE_STATE_PRESENT;
+
+    return val;
 }
 
 unsigned int CeilLog2(unsigned int x) {
@@ -76,6 +110,11 @@ BBitSet(std::vector<u64>& data, u32 idx) {
 inline void
 BBitClear(std::vector<u64>& data, u32 idx) {
     data[idx >> 6] &= ~(1ull << (idx & 63));
+}
+
+std::wstring
+ToWideString(std::string str) {
+    return { str.begin(), str.end() };
 }
 }//anonymous namespace
 
@@ -114,6 +153,119 @@ DX12SlabAllocator::Initialize(
 void
 DX12SlabAllocator::Release() {
     SafeRelease(m_Heap);
+}
+
+Result::Code
+DX12DescriptorHeap::Initialize(ID3D12Device14* const device,
+    u32 size,
+    D3D12_DESCRIPTOR_HEAP_TYPE type,
+    bool shader_visible) {
+    if (!device) {
+        LOG_ERROR("D3D12: Nullptr passed to CRHIDescriptorHeap_DX12::Create()!");
+        return Result::ENullptr;
+    }
+
+    m_Type = type;
+
+    D3D12_DESCRIPTOR_HEAP_DESC desc{};
+    desc.Type = type;
+    desc.NumDescriptors = size;
+    desc.Flags = shader_visible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+    desc.NodeMask = 0;
+
+    HRESULT hr{ S_OK };
+    hr = device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_Heap));
+    if (FAILED(hr)) {
+        LOG_ERROR("D3D12: Failed to create descriptor heap!");
+        return Result::ECreateRHIObject;
+    }
+
+    m_Capacity = size;
+    m_ShaderVisible = shader_visible;
+    m_CpuStart = m_Heap->GetCPUDescriptorHandleForHeapStart();
+    if (m_ShaderVisible) {
+        m_GpuStart = m_Heap->GetGPUDescriptorHandleForHeapStart();
+    }
+    m_IncrementSize = device->GetDescriptorHandleIncrementSize(type);
+
+    m_FreeList.Resize(m_Capacity);
+    for (u32 i = 0; i < m_Capacity; ++i)
+        m_FreeList[i] = i;
+
+    LOG_INFO("D3D12: Created descriptor heap Size=%u, ShaderVisible=%u", m_Capacity, (u32)m_ShaderVisible);
+
+    return Result::Ok;
+}
+
+void
+DX12DescriptorHeap::Release() {
+    SafeRelease(m_Heap);
+    LOG_INFO("D3D12: Destroyed descriptor heap Size=%u, ShaderVisible=%u", m_Capacity, (u32)m_ShaderVisible);
+}
+
+u32
+DX12DescriptorHeap::Allocate() {
+    if (m_FreeList.Empty())
+        return (u32)~0;
+
+    u32 idx{ m_FreeList.Back() };
+    m_FreeList.PopBack();
+    return idx;
+}
+
+u32
+DX12DescriptorHeap::Allocate(u32 count) {
+    if (count == 0 || m_FreeList.Size() < count)
+        return (u32)~0;
+
+    for (u32 i{ 0 }; i + count <= m_FreeList.Size(); ++i) {
+        u32 base = m_FreeList[i];
+        bool contiguous = true;
+
+        for (u32 j = 1; j < count; ++j) {
+            if (m_FreeList[i + j] != base + j) {
+                contiguous = false;
+                break;
+            }
+        }
+
+        if (contiguous) {
+            m_FreeList.Erase(
+                m_FreeList.begin() + i,
+                m_FreeList.begin() + i + count
+            );
+
+            return base;
+        }
+    }
+
+    return (u32)~0;
+}
+
+void
+DX12DescriptorHeap::Free(u32 index, u64 fence_value) {
+    m_PendingFrees.push_back({ fence_value, index });
+}
+
+void
+DX12DescriptorHeap::Free(u32 base, u32 count, u64 fence_value) {
+    for (u32 i = 0; i < count; ++i)
+        m_PendingFrees.push_back({ fence_value, base + i });
+}
+
+void
+DX12DescriptorHeap::Collect(u64 fence) {
+    while (!m_PendingFrees.empty()) {
+        auto& pf = m_PendingFrees.front();
+        if (pf.FenceValue == fence) {
+            m_FreeList.PushBack(pf.Index);
+            m_PendingFrees.pop_front();
+        }
+        else
+            break;
+    }
+
+    std::sort(m_FreeList.begin(), m_FreeList.end());
 }
 
 HeapAllocInfo
@@ -311,7 +463,8 @@ CRHIDevice_DX12::CRHIDevice_DX12(
     m_FeatureLevel(),
     m_Device(),
     m_GraphicsQueue(),
-    m_BufferHeaps() {
+    m_BufferHeaps(),
+    m_SrvHeap() {
 
     if (!(adapter && m_Factory)) {
         LOG_ERROR("Invalid adapter/factory given to device!");
@@ -380,11 +533,13 @@ CRHIDevice_DX12::CRHIDevice_DX12(
     }
 
     m_BufferHeaps.Initialize(m_Device, ResourceUsage::Default);
+    m_SrvHeap.Initialize(m_Device, info.MaxShaderResources, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true);
 }
 
 void
 CRHIDevice_DX12::Release() {
     m_BufferHeaps.Release();
+    m_SrvHeap.Release();
 
     SafeRelease(m_GraphicsQueue);
 
@@ -477,12 +632,35 @@ CRHIDevice_DX12::CreateSurface(const SurfaceInitInfo& info,
         return Result::ENomemory;
     }
 
-    if (!temp->GetNative()) {
+    if (!(temp->GetNative() && temp->GetNativeBuffer(0))) {
         delete temp;
         return Result::ECreateRHIObject;
     }
 
     *surface = temp;
+
+    return Result::Ok;
+}
+
+Result::Code
+CRHIDevice_DX12::CreateFrameGraph(const RHIGraphBuilder& builder,
+    u32 flags,
+    IRHIFrameGraph** outHandle)
+{
+    CRHIFrameGraph_DX12* temp{ new CRHIFrameGraph_DX12() };
+    if (!temp) {
+        return Result::ENomemory;
+    }
+
+    Result::Code res{ Result::Ok };
+    res = temp->Initialize(this, flags, builder);
+
+    if (Result::Fail(res)) {
+        delete temp;
+        return res;
+    }
+
+    *outHandle = temp;
 
     return Result::Ok;
 }
@@ -549,7 +727,11 @@ CRHISurface_DX12::CRHISurface_DX12(
     : m_Swapchain(),
     m_Buffers(),
     m_BufferCount(info.TripleBuffering ? 3 : 2),
-    m_SupportTearing() {
+    m_SupportTearing(),
+    m_RtvHeap(),
+    m_BaseDescriptor(),
+    m_DescriptorSize(),
+    m_CurrentBB() {
     if (!(device && factory &&
         info.Native && device->GetGraphicsQueue()
         && factory->GetNative())) {
@@ -558,6 +740,7 @@ CRHISurface_DX12::CRHISurface_DX12(
 
     const HWND hwnd{ (const HWND)info.Native };
     IDXGIFactory7* const dxgi{ (IDXGIFactory7* const)factory->GetNative() };
+    ID3D12Device14* const d3d12{ (ID3D12Device14* const)device->GetNative() };
     m_SupportTearing = factory->SupportsTearing() && info.AllowTearing;
 
     DXGI_SWAP_CHAIN_DESC1 swap_desc{};
@@ -591,17 +774,28 @@ CRHISurface_DX12::CRHISurface_DX12(
 
     temp->QueryInterface(IID_PPV_ARGS(&m_Swapchain));
 
-    for (u32 i{ 0 }; i < m_BufferCount; ++i) {
-        m_Swapchain->GetBuffer(i, IID_PPV_ARGS(&m_Buffers[i]));
-        if (!m_Buffers[i]) {
-            LOG_ERROR("Failed to get swapchain buffers!");
-            return;
-        }
+    D3D12_DESCRIPTOR_HEAP_DESC heap{};
+    heap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+    heap.NumDescriptors = m_BufferCount;
+    heap.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+    heap.NodeMask = 0;
+
+    hr = d3d12->CreateDescriptorHeap(&heap, IID_PPV_ARGS(&m_RtvHeap));
+    if (FAILED(hr)) {
+        LOG_ERROR("Failed to create surface rtv heap!");
+        return;
     }
+
+    m_BaseDescriptor = m_RtvHeap->GetCPUDescriptorHandleForHeapStart();
+    m_DescriptorSize = d3d12->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+    Finalize(d3d12);
 }
 
 void
 CRHISurface_DX12::Release() {
+    SafeRelease(m_RtvHeap);
+
     for (u32 i{ 0 }; i < m_BufferCount; ++i) {
         SafeRelease(m_Buffers[i]);
     }
@@ -619,5 +813,719 @@ CRHISurface_DX12::GetBufferCount() const {
 void* const
 CRHISurface_DX12::GetNative() const {
     return m_Swapchain;
+}
+
+void* const
+CRHISurface_DX12::GetNativeBuffer(u32 index) const {
+    if (index >= m_BufferCount)
+        return nullptr;
+
+    return m_Buffers[index];
+}
+
+void
+CRHISurface_DX12::Present(bool vsync) {
+    m_Swapchain->Present(vsync ? 1 : 0, vsync ? 0 : DXGI_PRESENT_ALLOW_TEARING);
+    m_CurrentBB = m_Swapchain->GetCurrentBackBufferIndex();
+}
+
+u32
+CRHISurface_DX12::GetCurrentBBIndex() const {
+    return m_CurrentBB;
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE
+CRHISurface_DX12::GetBufferDescriptor(u32 index) {
+    if (index >= m_BufferCount)
+        return {};
+
+    return { m_BaseDescriptor.ptr + (index * m_DescriptorSize) };
+}
+
+void
+CRHISurface_DX12::Finalize(ID3D12Device14* const d3d12) {
+    for (u32 i{ 0 }; i < m_BufferCount; ++i) {
+        m_Swapchain->GetBuffer(i, IID_PPV_ARGS(&m_Buffers[i]));
+        if (!m_Buffers[i]) {
+            LOG_ERROR("Failed to get swapchain buffers!");
+            return;
+        }
+
+        d3d12->CreateRenderTargetView(
+            m_Buffers[i],
+            nullptr,
+            GetBufferDescriptor(i));
+    }
+
+    m_CurrentBB = m_Swapchain->GetCurrentBackBufferIndex();
+}
+
+Result::Code
+CRHIFrameGraph_DX12::Initialize(
+    CRHIDevice_DX12* const device,
+    u32 flags,
+    const RHIGraphBuilder& builder) {
+    if (!device) {
+        return Result::ENullptr;
+    }
+
+    const Vector<Vector<u32>> dependencies{ GetDependencies(builder) };
+    if ((u32)(flags & FGCompileFlags::LogInfo)) {
+        PrintDependencies(dependencies);
+    }
+
+    ID3D12Device14* const d3d12{ (ID3D12Device14* const)device->GetNative() };
+    const Vector<u32> sorted{ TopologicalSort(dependencies) };
+    const Vector<RHIGraphBuilder::FGPassDesc>& passes{ builder.GetPasses() };
+    const Vector<FGResourceInitInfo>& resources{ builder.GetResources() };
+    const bool debug_names{ (const bool)(flags & FGCompileFlags::DebugNames) };
+
+    {
+        Result::Code res{ m_Queue.Initialize(
+            d3d12,
+            device->GetGraphicsQueue(),
+            D3D12_COMMAND_LIST_TYPE_DIRECT) };
+        if (Result::Fail(res)) {
+            return res;
+        }
+    }
+
+    m_Passes.Resize(sorted.Size());
+    for (u32 i{ 0 }; i < m_Passes.Size(); ++i) {
+        m_Passes[i].Func = passes[sorted[i]].Func;
+    }
+
+    using namespace Shared;
+
+    m_DescResources.Resize(resources.Size());
+    Vector<D3D12_RESOURCE_DESC> resource_descs{};
+
+    u32 total_count{};
+
+    for (u32 i{ 0 }; i < resources.Size(); ++i) {
+        const FGResourceInitInfo& info{ resources[i] };
+
+        if (info.Type == FGResourceType::Swapchain) {
+            Resource res{};
+            res.Start = 0;
+            res.Count = (u16)info.TemporalCount;
+            res.Type = CompiledType::Swapchain;
+
+            m_DescResources[i] = res;
+            continue;
+        }
+
+        const u8 info_flags{ info.GetFlags() };
+        const CompiledType::Type compiled_type{ info.Type == FGResourceType::Texture
+            ? CompiledType::Texture : CompiledType::Buffer };
+
+        D3D12_RESOURCE_FLAGS bind_flags{};
+        if (!(info_flags & RHIGraphBuilder::ResourceFlag_SRV)) {
+            bind_flags |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
+        }
+        if (info_flags & RHIGraphBuilder::ResourceFlag_RTV) {
+            bind_flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+        }
+        if (info_flags & RHIGraphBuilder::ResourceFlag_DSV) {
+            bind_flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+        }
+        if (info_flags & RHIGraphBuilder::ResourceFlag_UAV) {
+            bind_flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+        }
+
+        D3D12_RESOURCE_DESC desc{};
+        desc.Dimension = ConvertResourceDimension(info.Type);
+        desc.Alignment = 0;
+        desc.Width = info.Width;
+        desc.Height = info.Height;
+        desc.DepthOrArraySize = (u16)info.DepthOrArray;
+        desc.MipLevels = (u16)info.MipLevels;
+        desc.Format = ConvertFormat(info.StorageFormat);
+        desc.SampleDesc = { 1, 0 };
+        desc.Layout = compiled_type == CompiledType::Texture
+            ? D3D12_TEXTURE_LAYOUT_64KB_UNDEFINED_SWIZZLE
+            : D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+        desc.Flags = bind_flags;
+
+        resource_descs.PushBack(desc);
+
+        Resource res{};
+        res.Start = (u16)total_count;
+        res.Count = (u16)info.TemporalCount;
+        res.Type = compiled_type;
+
+        m_DescResources[i] = res;
+        total_count += info.TemporalCount;
+    }
+
+    m_Resources.Resize(total_count);
+    D3D12_RESOURCE_ALLOCATION_INFO alloc_info{
+        d3d12->GetResourceAllocationInfo(0,
+            (u32)resource_descs.Size(),
+            resource_descs.Data())
+    };
+
+    if (!alloc_info.SizeInBytes) {
+        LOG_ERROR("No memory requested by frame graph!");
+        return Result::EFrameGraph;
+    }
+
+    m_Heap.Initialize(d3d12, alloc_info.SizeInBytes, alloc_info.Alignment);
+
+    Vector<D3D12_RESOURCE_STATES> last_states{};
+    last_states.Resize(m_DescResources.Size());
+
+    {
+        u64 heap_offset{};
+
+        for (u32 i{ 0 }; i < resources.Size(); ++i) {
+            const Resource& res{ m_DescResources[i] };
+            if (res.Type == CompiledType::Swapchain) {
+                last_states[i] = D3D12_RESOURCE_STATE_PRESENT;
+                continue;
+            }
+
+            const D3D12_RESOURCE_DESC& desc{ resource_descs[i] };
+            const D3D12_RESOURCE_STATES last_state{ ConvertResourceStates(resources[i].GetLastState()) };
+            last_states[i] = last_state;
+
+            for (u32 temporal{ 0 }; temporal < res.Count; ++temporal) {
+                HRESULT hr{ S_OK };
+                hr = d3d12->CreatePlacedResource(
+                    m_Heap.Heap,
+                    heap_offset,
+                    &desc,
+                    last_state,
+                    nullptr,
+                    IID_PPV_ARGS(&m_Resources[res.Start + temporal]));
+                if (FAILED(hr)) {
+                    LOG_ERROR("Failed to create graph resource!");
+                    return Result::ECreateResource;
+                }
+
+                if (debug_names) {
+                    m_Resources[res.Start + temporal]->SetName(
+                        ToWideString(resources[i].Name).c_str()
+                    );
+                }
+
+                MemFree((void*)resources[i].Name);
+
+                D3D12_RESOURCE_ALLOCATION_INFO resource_info{ d3d12->GetResourceAllocationInfo(0, 1, &desc) };
+
+                heap_offset += Math::AlignUp(resource_info.SizeInBytes, resource_info.Alignment);
+            }
+        }
+    }
+
+    const u32 num_srvs{ builder.GetSRViewCounter() };
+    const u32 num_rtvs{ builder.GetRTViewCounter() };
+    const u32 num_dsvs{ builder.GetDSViewCounter() };
+
+    DX12DescriptorHeap& srv_heap{ device->GetSrvHeap() };
+    m_SrvHeapData.Start = srv_heap.Allocate(num_srvs);
+    m_SrvHeapData.Count = num_srvs;
+
+    if (m_SrvHeapData.Start == (u32)~0) {
+        LOG_ERROR("Failed to allocate graph descriptors!");
+        return Result::ECreateRHIObject;
+    }
+
+    m_SrvHeapData.CpuStart = srv_heap.GetCpuHandle(m_SrvHeapData.Start);
+    m_SrvHeapData.GpuStart = srv_heap.GetGpuHandle(m_SrvHeapData.Start);
+
+    Result::Code res{ Result::Ok };
+    res = m_RtvHeap.Initialize(d3d12, num_rtvs, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, false);
+    if (Result::Fail(res)) {
+        LOG_ERROR("Failed to allocate graph descriptors!");
+        return Result::ECreateRHIObject;
+    }
+
+    res = m_DsvHeap.Initialize(d3d12, num_dsvs, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, false);
+    if (Result::Fail(res)) {
+        LOG_ERROR("Failed to allocate graph descriptors!");
+        return Result::ECreateRHIObject;
+    }
+
+    std::unordered_map<ViewCacheEntry, u32, ViewCacheHasher> view_cache;
+
+    u16 srv_heap_index{ 0 };
+    u16 rtv_heap_index{ 0 };
+    u16 dsv_heap_index{ 0 };
+
+    for (u32 i{ 0 }; i < (u32)m_Passes.Size(); ++i) {
+        const RHIGraphBuilder::FGPassDesc& pass_desc{ passes[i] };
+        Pass& compiled{ m_Passes[i] };
+
+        for (u32 j{ 0 }; j < (u32)pass_desc.Reads.Size(); ++j) {
+            const auto& read{ pass_desc.Reads[j] };
+            const u32 slot{ read.Slot };
+            const Resource& resource{ m_DescResources[read.Resource] };
+
+            //TODO: Handle barriers
+            if (resource.Type == CompiledType::Swapchain) {
+                continue;
+            }
+
+            ViewCacheEntry entry{};
+            entry.Resource = read.Resource;
+            entry.Format = read.ViewFormat;
+            entry.BaseMip = read.Range.BaseMip;
+            entry.MipCount = read.Range.MipCount;
+            entry.BaseLayer = read.Range.BaseLayer;
+            entry.LayerCount = read.Range.LayerCount;
+            entry.Plane = read.Range.Plane;
+
+            const D3D12_RESOURCE_STATES new_state{ ConvertResourceStates(read.State) };
+
+            BarrierDesc barrier{};
+            barrier.Resource = read.Resource;
+            barrier.Before = last_states[read.Resource];
+            barrier.After = new_state;
+            last_states[read.Resource] = new_state;
+
+            auto it = view_cache.find(entry);
+            if (it == view_cache.end()) {
+                if (read.State & ResourceState::PixelResource
+                    || read.State & ResourceState::NonPixelResource) {
+                    View view{};
+                    view.Resource = (u16)entry.Resource;
+                    view.Type = ViewType::ShaderResource;
+                    view.BaseIndex = srv_heap_index;
+
+                    D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
+                    desc.Format = ConvertFormat(entry.Format);
+                    desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+                    desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+                    desc.Texture2D.MostDetailedMip = entry.BaseMip;
+                    desc.Texture2D.MipLevels = entry.MipCount;
+                    desc.Texture2D.PlaneSlice = entry.Plane;
+                    desc.Texture2D.ResourceMinLODClamp = 0.f;
+
+                    for (u32 temporal{ 0 }; temporal < resource.Count; ++temporal) {
+                        d3d12->CreateShaderResourceView(
+                            m_Resources[resource.Start + temporal],
+                            &desc,
+                            srv_heap.GetCpuHandle(m_SrvHeapData.Start + srv_heap_index + temporal)
+                        );
+                    }
+
+                    srv_heap_index += resource.Count;
+
+                    const u32 view_id{ m_DescViews.Size() };
+                    view_cache[entry] = view_id;
+                    m_DescViews.EmplaceBack(view);
+
+                    BoundView binding{};
+                    binding.View = (u16)view_id;
+                    binding.Slot = (u16)slot;
+                    compiled.Srvs.PushBack(binding);
+                }
+                else if (read.State & ResourceState::DepthRead) {
+                    View view{};
+                    view.Resource = (u16)entry.Resource;
+                    view.Type = ViewType::DepthStencil;
+                    view.BaseIndex = dsv_heap_index;
+
+                    D3D12_DEPTH_STENCIL_VIEW_DESC desc{};
+                    desc.Format = ConvertFormat(entry.Format);
+                    desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+                    desc.Flags = D3D12_DSV_FLAG_READ_ONLY_DEPTH
+                        | D3D12_DSV_FLAG_READ_ONLY_STENCIL;
+                    desc.Texture2D.MipSlice = entry.BaseMip;
+
+                    for (u32 temporal{ 0 }; temporal < resource.Count; ++temporal) {
+                        d3d12->CreateDepthStencilView(
+                            m_Resources[resource.Start + temporal],
+                            &desc,
+                            m_DsvHeap.GetCpuHandle(dsv_heap_index + temporal)
+                        );
+                    }
+
+                    dsv_heap_index += resource.Count;
+
+                    const u32 view_id{ m_DescViews.Size() };
+                    view_cache[entry] = view_id;
+                    m_DescViews.EmplaceBack(view);
+
+                    compiled.HasDsv = 1;
+                    compiled.Dsv.View = (u16)view_id;
+                    compiled.Dsv.Slot = 0;
+                }
+            }
+            else {
+                if (read.State & ResourceState::PixelResource
+                    || read.State & ResourceState::NonPixelResource) {
+                    BoundView binding{};
+                    binding.View = (u16)it->second;
+                    binding.Slot = (u16)slot;
+                    compiled.Srvs.PushBack(binding);
+                }
+                else if (read.State & ResourceState::DepthRead) {
+                    compiled.HasDsv = 1;
+                    compiled.Dsv.View = (u16)it->second;
+                    compiled.Dsv.Slot = (u16)slot;
+                }
+            }
+        }
+
+        for (u32 j{ 0 }; j < (u32)pass_desc.Writes.Size(); ++j) {
+            const auto& write{ pass_desc.Writes[j] };
+            const u32 slot{ write.Slot };
+            const Resource& resource{ m_DescResources[write.Resource] };
+
+            if (write.ClearOp == FGClearOp::RenderTarget) {
+                compiled.RtvClearValues[slot].X = write.ClearValue.Color[0];
+                compiled.RtvClearValues[slot].Y = write.ClearValue.Color[1];
+                compiled.RtvClearValues[slot].Z = write.ClearValue.Color[2];
+                compiled.RtvClearValues[slot].W = write.ClearValue.Color[3];
+                compiled.EnableClearTarget((u16)slot);
+            }
+            else if (write.ClearOp == FGClearOp::DepthStencil) {
+                compiled.DepthClearValue.Depth = write.ClearValue.Depth.Depth;
+                compiled.DepthClearValue.Stencil = write.ClearValue.Depth.Stencil;
+                compiled.EnableClearDepth();
+            }
+
+            if (resource.Type == CompiledType::Swapchain) {
+                const D3D12_RESOURCE_STATES new_state{ ConvertResourceStates(write.State) };
+
+                BarrierDesc barrier{};
+                barrier.Resource = (u32)~0;
+                barrier.Before = last_states[write.Resource];
+                barrier.After = new_state;
+                last_states[write.Resource] = new_state;
+
+                compiled.Barriers.PushBack(barrier);
+
+                compiled.NumRtvs++;
+                compiled.Rtvs[slot].Slot = (u16)slot;
+                compiled.Rtvs[slot].View = (u16)~0;
+                continue;
+            }
+
+            ViewCacheEntry entry{};
+            entry.Resource = write.Resource;
+            entry.Format = write.ViewFormat;
+            entry.BaseMip = write.Range.BaseMip;
+            entry.MipCount = write.Range.MipCount;
+            entry.BaseLayer = write.Range.BaseLayer;
+            entry.LayerCount = write.Range.LayerCount;
+            entry.Plane = write.Range.Plane;
+
+            const D3D12_RESOURCE_STATES new_state{ ConvertResourceStates(write.State) };
+
+            BarrierDesc barrier{};
+            barrier.Resource = write.Resource;
+            barrier.Before = last_states[write.Resource];
+            barrier.After = new_state;
+            last_states[write.Resource] = new_state;
+
+            compiled.Barriers.PushBack(barrier);
+
+            auto it = view_cache.find(entry);
+            if (it == view_cache.end()) {
+                if (write.State & ResourceState::RenderTarget) {
+                    View view{};
+                    view.Resource = (u16)entry.Resource;
+                    view.Type = ViewType::RenderTarget;
+                    view.BaseIndex = rtv_heap_index;
+
+                    D3D12_RENDER_TARGET_VIEW_DESC desc{};
+                    desc.Format = ConvertFormat(entry.Format);
+                    desc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+                    desc.Texture2D.MipSlice = entry.BaseMip;
+                    desc.Texture2D.PlaneSlice = entry.Plane;
+
+                    for (u32 temporal{ 0 }; temporal < resource.Count; ++temporal) {
+                        d3d12->CreateRenderTargetView(
+                            m_Resources[resource.Start + temporal],
+                            &desc,
+                            m_RtvHeap.GetCpuHandle(rtv_heap_index + temporal)
+                        );
+                    }
+
+                    rtv_heap_index += resource.Count;
+
+                    const u32 view_id{ m_DescViews.Size() };
+
+                    view_cache[entry] = view_id;
+                    m_DescViews.EmplaceBack(view);
+
+                    compiled.NumRtvs++;
+                    compiled.Rtvs[slot].Slot = (u16)slot;
+                    compiled.Rtvs[slot].View = (u16)view_id;
+                }
+                else if (write.State & ResourceState::DepthWrite) {
+                    View view{};
+                    view.Resource = (u16)entry.Resource;
+                    view.Type = ViewType::DepthStencil;
+                    view.BaseIndex = dsv_heap_index;
+
+                    D3D12_DEPTH_STENCIL_VIEW_DESC desc{};
+                    desc.Format = ConvertFormat(entry.Format);
+                    desc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+                    desc.Flags = D3D12_DSV_FLAG_NONE;
+                    desc.Texture2D.MipSlice = entry.BaseMip;
+
+                    for (u32 temporal{ 0 }; temporal < resource.Count; ++temporal) {
+                        d3d12->CreateDepthStencilView(
+                            m_Resources[resource.Start + temporal],
+                            &desc,
+                            m_DsvHeap.GetCpuHandle(dsv_heap_index + temporal)
+                        );
+                    }
+
+                    dsv_heap_index += resource.Count;
+
+                    const u32 view_id{ m_DescViews.Size() };
+                    view_cache[entry] = view_id;
+                    m_DescViews.EmplaceBack(view);
+
+                    compiled.HasDsv = 1;
+                    compiled.Dsv.View = (u16)view_id;
+                    compiled.Dsv.Slot = 0;
+                }
+            }
+            else {
+                if (write.State & ResourceState::RenderTarget) {
+                    compiled.NumRtvs++;
+                    compiled.Rtvs[slot].Slot = (u16)slot;
+                    compiled.Rtvs[slot].View = (u16)it->second;
+                }
+                else if (write.State & ResourceState::DepthRead) {
+                    compiled.HasDsv = 1;
+                    compiled.Dsv.View = (u16)it->second;
+                    compiled.Dsv.Slot = (u16)write.Slot;
+                }
+            }
+        }
+    }
+
+    return Result::Ok;
+}
+
+void
+CRHIFrameGraph_DX12::Release() {
+    m_Queue.Release();
+    m_RtvHeap.Release();
+    m_DsvHeap.Release();
+
+    for (auto& res : m_Resources) {
+        SafeRelease(res);
+    }
+
+    m_Heap.Release();
+}
+
+void
+CRHIFrameGraph_DX12::Execute(
+    IRHISurface* const surface,
+    u64 frameNumber) {
+    CRHISurface_DX12* const dx_surface{ (CRHISurface_DX12* const)surface };
+
+    m_Queue.Begin();
+
+    ID3D12GraphicsCommandList10* const cmd{ m_Queue.List };
+    ID3D12Resource* const surface_buffer{ (ID3D12Resource* const)dx_surface->GetNativeBuffer(dx_surface->GetCurrentBBIndex()) };
+    D3D12_RESOURCE_STATES last_surface_state{};
+    DX12Barriers barriers{};
+
+    for (const auto& pass : m_Passes) {
+        const u32 num_rtvs{ pass.NumRtvs };
+        const bool has_dsv{ (bool)pass.HasDsv };
+
+        if (pass.Barriers.Size()) {
+            for (u32 i{ 0 }; i < pass.Barriers.Size(); ++i) {
+                const BarrierDesc& desc{ pass.Barriers[i] };
+                D3D12_RESOURCE_BARRIER b{};
+                b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                b.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+                b.Transition.Subresource = 0;
+                b.Transition.StateBefore = desc.Before;
+                b.Transition.StateAfter = desc.After;
+
+                if (desc.Resource == (u32)~0) {
+                    b.Transition.pResource = surface_buffer;
+                    last_surface_state = desc.After;
+                }
+                else {
+                    const Resource& resource{ m_DescResources[desc.Resource] };
+                    const u32 actual_index{ CalculateTemporal(frameNumber, resource.Start, resource.Count) };
+                    b.Transition.pResource = m_Resources[actual_index];
+                    continue;
+                }
+
+                barriers.Add(b);
+            }
+
+            barriers.Apply(cmd);
+        }
+
+        D3D12_CPU_DESCRIPTOR_HANDLE targets[RHI_MAX_TARGET_COUNT]{};
+        D3D12_CPU_DESCRIPTOR_HANDLE depth{};
+
+        for (u16 i{ 0 }; i < num_rtvs; ++i) {
+            const u16 view_handle{ pass.Rtvs[i].View };
+            if (view_handle == (u16)~0) {
+                targets[i] = dx_surface->GetBufferDescriptor(dx_surface->GetCurrentBBIndex());
+            }
+            else {
+                const View& view_desc{ m_DescViews[view_handle] };
+                const Resource& resource{ m_DescResources[view_desc.Resource] };
+
+                const u32 actual_index{ CalculateTemporal(frameNumber, view_desc.BaseIndex, resource.Count) };
+
+                targets[i] = m_RtvHeap.GetCpuHandle(actual_index);
+            }
+
+            if (pass.HasTargetClear(i)) {
+                cmd->ClearRenderTargetView(targets[i],
+                    &pass.RtvClearValues[i].X,
+                    0,
+                    nullptr);
+            }
+        }
+
+        if (has_dsv) {
+            const u16 view_handle{ pass.Dsv.View };
+            const View& view_desc{ m_DescViews[view_handle] };
+            const Resource& resource{ m_DescResources[view_desc.Resource] };
+
+            const u32 actual_index{ CalculateTemporal(frameNumber, view_desc.BaseIndex, resource.Count) };
+
+            depth = m_DsvHeap.GetCpuHandle(actual_index);
+            if (pass.HasDepthClear()) {
+                //TODO: Only depth or stencil???
+                cmd->ClearDepthStencilView(depth,
+                    D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL,
+                    pass.DepthClearValue.Depth,
+                    pass.DepthClearValue.Stencil,
+                    0,
+                    nullptr);
+            }
+        }
+
+        cmd->OMSetRenderTargets(num_rtvs, &targets[0], FALSE, has_dsv ? &depth : nullptr);
+    }
+
+    D3D12_RESOURCE_BARRIER present_barrier{};
+    present_barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    present_barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    present_barrier.Transition.pResource = surface_buffer;
+    present_barrier.Transition.Subresource = 0;
+    present_barrier.Transition.StateBefore = last_surface_state;
+    present_barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+    
+    barriers.Add(present_barrier);
+    barriers.Apply(cmd);
+
+    m_Queue.End(dx_surface);
+}
+
+
+Vector<Vector<u32>>
+CRHIFrameGraph_DX12::GetDependencies(
+    const RHIGraphBuilder& builder) const {
+    const Vector<RHIGraphBuilder::FGPassDesc>& passes{ builder.GetPasses() };
+    const u32 num_passes{ passes.Size() };
+
+    Vector<Vector<u32>> dependencies(num_passes);
+
+    std::unordered_map<FGResource, Vector<u32>> writers;
+    writers.reserve(num_passes * 2);
+
+    for (u32 passIndex{ 0 }; passIndex < num_passes; ++passIndex) {
+        for (const RHIGraphBuilder::FGResourceUsage& write : passes[passIndex].Writes) {
+            writers[write.Resource].PushBack(passIndex);
+        }
+    }
+
+    for (u32 passIndex{ 0 }; passIndex < num_passes; ++passIndex) {
+        auto& deps = dependencies[passIndex];
+
+        for (const RHIGraphBuilder::FGResourceUsage& read : passes[passIndex].Reads) {
+            auto it = writers.find(read.Resource);
+            if (it == writers.end())
+                continue;
+
+            for (u32 writerPass : it->second) {
+                if (writerPass != passIndex) {
+                    deps.PushBack(writerPass);
+                }
+            }
+        }
+
+        // Optional: remove duplicates
+        std::sort(deps.begin(), deps.end());
+        deps.Erase(std::unique(deps.begin(), deps.end()), deps.end());
+    }
+
+    return dependencies;
+}
+
+Vector<u32>
+CRHIFrameGraph_DX12::TopologicalSort(
+    const Vector<Vector<u32>>& dependencies) const {
+    const u32 numPasses = static_cast<u32>(dependencies.Size());
+
+    Vector<u32> inDegree(numPasses, 0);
+    Vector<std::vector<u32>> dependents(numPasses);
+
+    for (u32 pass = 0; pass < numPasses; ++pass) {
+        for (u32 dep : dependencies[pass]) {
+            ++inDegree[pass];
+            dependents[dep].push_back(pass);
+        }
+    }
+
+    std::queue<u32> ready;
+    for (u32 i = 0; i < numPasses; ++i) {
+        if (inDegree[i] == 0) {
+            ready.push(i);
+        }
+    }
+
+    Vector<u32> sorted;
+    sorted.Reserve(numPasses);
+
+    while (!ready.empty()) {
+        u32 pass = ready.front();
+        ready.pop();
+
+        sorted.PushBack(pass);
+
+        for (u32 dependent : dependents[pass]) {
+            if (--inDegree[dependent] == 0) {
+                ready.push(dependent);
+            }
+        }
+    }
+
+    if (sorted.Size() != numPasses) {
+        // Cycle detected: graph is invalid
+        LOG_ERROR("D3D12RHI: Cycle detected in Task Graph!");
+    }
+
+    return sorted;
+}
+
+void
+CRHIFrameGraph_DX12::PrintDependencies(
+    const Vector<Vector<u32>>& dependencies) const {
+    LOG_DEBUG("Task Graph Dependencies:");
+
+    for (u32 pass = 0; pass < dependencies.Size(); ++pass) {
+        LOG_DEBUG("Pass %u depends on: ");
+
+        if (dependencies[pass].Empty()) {
+            LOG_DEBUG("(none)");
+        }
+        else {
+            for (u32 dep : dependencies[pass]) {
+                LOG_DEBUG("    %u", dep);
+            }
+        }
+    }
 }
 }

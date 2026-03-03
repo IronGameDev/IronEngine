@@ -89,7 +89,6 @@ private:
     bool                        m_SupportTearing;
 };
 
-//TODO: Slot binding
 class CRHIFrameGraph_DX11 : public IRHIFrameGraph {
     struct CompiledType {
         enum Type : u16 {

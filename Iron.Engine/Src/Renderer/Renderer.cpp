@@ -109,6 +109,7 @@ RenderContext::RenderContext(void* factoryPtr)
     device_info.Backend = atoi(Config.Get("renderer", "force_legacy", "0")) ? RHIBackend::DirectX11 : RHIBackend::DirectX12;
     device_info.Debug = atoi(Config.Get("renderer", "debug_device", "0"));
     device_info.DisableGPUTimeout = atoi(Config.Get("renderer", "disable_gpu_timeout", "0"));
+    device_info.MaxShaderResources = atoi(Config.Get("renderer", "max_shader_resources", "2048"));
 
     m_AllowTearing = atoi(Config.Get("renderer", "allow_tearing", "0"));
     m_TripleBuffering = atoi(Config.Get("renderer", "triple_buffer", "1"));
@@ -183,7 +184,7 @@ RenderContext::InitializeForWindow(Window::IWindow* const window) {
     RHIGraphBuilder builder{};
     SetupRenderer(builder);
     
-    m_Device->CreateFrameGraph(builder, FGCompileFlags::LogInfo & FGCompileFlags::DebugNames, &m_FrameGraph);
+    m_Device->CreateFrameGraph(builder, FGCompileFlags::LogInfo | FGCompileFlags::DebugNames, &m_FrameGraph);
 
     return res;
 }
