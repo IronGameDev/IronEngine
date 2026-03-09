@@ -4,6 +4,53 @@
 #include <dxgi1_6.h>
 
 namespace Iron::RHI::D3D11 {
+template<typename T>
+struct D3D11FeatureTraits {
+    static void PreQuery(T&) {}
+};
+
+template<>
+struct D3D11FeatureTraits<D3D11_FEATURE_DATA_D3D11_OPTIONS> {
+    static constexpr D3D11_FEATURE Feature = D3D11_FEATURE_D3D11_OPTIONS;
+    static void PreQuery(D3D11_FEATURE_DATA_D3D11_OPTIONS&) {}
+};
+
+template<>
+struct D3D11FeatureTraits<D3D11_FEATURE_DATA_D3D11_OPTIONS1> {
+    static constexpr D3D11_FEATURE Feature = D3D11_FEATURE_D3D11_OPTIONS1;
+    static void PreQuery(D3D11_FEATURE_DATA_D3D11_OPTIONS1&) {}
+};
+
+template<>
+struct D3D11FeatureTraits<D3D11_FEATURE_DATA_D3D11_OPTIONS2> {
+    static constexpr D3D11_FEATURE Feature = D3D11_FEATURE_D3D11_OPTIONS2;
+    static void PreQuery(D3D11_FEATURE_DATA_D3D11_OPTIONS2&) {}
+};
+
+template<>
+struct D3D11FeatureTraits<D3D11_FEATURE_DATA_D3D11_OPTIONS3> {
+    static constexpr D3D11_FEATURE Feature = D3D11_FEATURE_D3D11_OPTIONS3;
+    static void PreQuery(D3D11_FEATURE_DATA_D3D11_OPTIONS3&) {}
+};
+
+template<>
+struct D3D11FeatureTraits<D3D11_FEATURE_DATA_D3D11_OPTIONS4> {
+    static constexpr D3D11_FEATURE Feature = D3D11_FEATURE_D3D11_OPTIONS4;
+    static void PreQuery(D3D11_FEATURE_DATA_D3D11_OPTIONS4&) {}
+};
+
+template<>
+struct D3D11FeatureTraits<D3D11_FEATURE_DATA_D3D11_OPTIONS5> {
+    static constexpr D3D11_FEATURE Feature = D3D11_FEATURE_D3D11_OPTIONS5;
+    static void PreQuery(D3D11_FEATURE_DATA_D3D11_OPTIONS5&) {}
+};
+
+template<>
+struct D3D11FeatureTraits<D3D11_FEATURE_DATA_D3D11_OPTIONS6> {
+    static constexpr D3D11_FEATURE Feature = D3D11_FEATURE_D3D11_OPTIONS6;
+    static void PreQuery(D3D11_FEATURE_DATA_D3D11_OPTIONS6&) {}
+};
+
 class CRHIDevice_DX11 : public IRHIDevice {
 public:
     CRHIDevice_DX11(
@@ -14,23 +61,49 @@ public:
 
     void Release() override;
 
-    Result::Code CreateSurface(
-        const SurfaceInitInfo& info,
-        IRHISurface** surface) override;
-
     Result::Code CreateResource(
         const ResourceInitInfo& info,
         IRHIResource** resource) override;
+
+    Result::Code CreatePipelineLayout(
+        const PipelineLayoutInitInfo& info,
+        IRHIPipelineLayout** outHandle) override {
+        return Result::Ok;
+    }
+
+    Result::Code CreateSurface(
+        const SurfaceInitInfo& info,
+        IRHISurface** surface) override;
 
     Result::Code CreateFrameGraph(
         const RHIGraphBuilder& builder,
         u32 flags,
         IRHIFrameGraph** outHandle) override;
 
+    void GetFeatures(
+        DeviceFeatures* features) override;
+
     void* const GetNative() const override;
 
     constexpr ID3D11DeviceContext4* const GetContext() const {
         return m_Context;
+    }
+
+    template<typename T>
+    T QueryFeatureSupport() {
+        if (!m_Device)
+            return T();
+
+        T data{};
+        D3D11FeatureTraits<T>::PreQuery(data);
+
+        HRESULT hr{ m_Device->CheckFeatureSupport(
+            D3D11FeatureTraits<T>::Feature, &data,
+            sizeof(T)) };
+        if (FAILED(hr))
+            return T();
+
+        return data;
     }
 
 private:
@@ -43,6 +116,8 @@ private:
 
     ID3D11Device5*          m_Device;
     ID3D11DeviceContext4*   m_Context;
+
+    DeviceFeatures          m_Features;
 };
 
 class CRHIResource_DX11 : public IRHIResource {
@@ -173,6 +248,8 @@ public:
     void Execute(
         IRHISurface* const surface,
         u64 frameNumber) override;
+
+    void WaitIdle() override {}
 
 private:
     Vector<Vector<u32>> GetDependencies(const RHIGraphBuilder& builder) const;

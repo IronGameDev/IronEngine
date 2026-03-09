@@ -8,8 +8,11 @@ using namespace Iron::RHI;
 
 namespace Iron {
 namespace {
+IRHIPipelineLayout* layout{};
+
 void
 RenderStuff(RHICommandBuilder& ctx) {
+    ctx.SetGraphicsLayout(layout);
 }
 
 void
@@ -37,11 +40,11 @@ SetupRenderer(RHIGraphBuilder& builder) {
         1024,
         768,
         RHIFormat::R8G8B8A8_TYPELESS,
-        3
+        true
     );
 
     builder.BeginPass("DepthPrePass", RenderStuff);
-    builder.Write(depth, RHIFormat::D32_FLOAT, ResourceState::DepthWrite, 0);
+    builder.AddDepth(depth, RHIFormat::D32_FLOAT, ResourceState::DepthWrite);
     builder.EndPass();
 
     builder.BeginPass("SSAOPass", RenderStuff);
@@ -50,7 +53,7 @@ SetupRenderer(RHIGraphBuilder& builder) {
     builder.EndPass();
 
     builder.BeginPass("ColorPass", RenderStuff);
-    builder.Read(depth, RHIFormat::D32_FLOAT, ResourceState::DepthRead, 0);
+    builder.AddDepth(depth, RHIFormat::D32_FLOAT, ResourceState::DepthRead);
     builder.Read(ssao, RHIFormat::R8_UNORM, ResourceState::PixelResource, 0);
     builder.Write(color, RHIFormat::R8G8B8A8_UNORM, ResourceState::RenderTarget, 0);
     builder.EndPass();
@@ -186,11 +189,24 @@ RenderContext::InitializeForWindow(Window::IWindow* const window) {
     
     m_Device->CreateFrameGraph(builder, FGCompileFlags::LogInfo | FGCompileFlags::DebugNames, &m_FrameGraph);
 
+    PipelineLayoutParam params[1]{};
+    params[0].AsSRV(0, 0);
+
+    PipelineLayoutInitInfo l_info{};
+    l_info.NumParams = _countof(params);
+    l_info.Params = &params[0];
+
+    m_Device->CreatePipelineLayout(l_info, &layout);
+
     return res;
 }
 
 void
 RenderContext::Release() {
+    m_FrameGraph->WaitIdle();
+
+    SafeRelease(layout);
+
     SafeRelease(m_FrameGraph);
     SafeRelease(m_Surface);
     SafeRelease(m_Device);

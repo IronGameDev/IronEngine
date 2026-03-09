@@ -73,7 +73,8 @@ CRHIDevice_DX11::CRHIDevice_DX11(
     m_D3D11CreateDevice(),
     m_FeatureLevel(),
     m_Device(),
-    m_Context() {
+    m_Context(),
+    m_Features() {
     if (!(adapter && m_Factory)) {
         LOG_ERROR("Invalid adapter/factory given to device!");
         return;
@@ -131,6 +132,43 @@ CRHIDevice_DX11::CRHIDevice_DX11(
 
     device->QueryInterface(IID_PPV_ARGS(&m_Device));
     context->QueryInterface(IID_PPV_ARGS(&m_Context));
+
+    m_Features.Bindless = false;
+    m_Features.PushConstants = false;
+    m_Features.FeatureLevel.Major = ((m_FeatureLevel >> 8) & 0xf0) >> 4;
+    m_Features.FeatureLevel.Minor = (m_FeatureLevel >> 8) & 0xf;
+
+    switch (m_FeatureLevel)
+    {
+    case D3D_FEATURE_LEVEL_9_1:
+    case D3D_FEATURE_LEVEL_9_2:
+        m_Features.ShaderModel.Major = 2;
+        m_Features.ShaderModel.Minor = 0xf;
+        break;
+    case D3D_FEATURE_LEVEL_9_3:
+        m_Features.ShaderModel.Major = 3;
+        m_Features.ShaderModel.Minor = 0;
+        break;
+    case D3D_FEATURE_LEVEL_10_0:
+        m_Features.ShaderModel.Major = 4;
+        m_Features.ShaderModel.Minor = 0;
+        break;;
+    case D3D_FEATURE_LEVEL_10_1:
+        m_Features.ShaderModel.Major = 4;
+        m_Features.ShaderModel.Minor = 1;
+        break;
+    case D3D_FEATURE_LEVEL_11_0:
+    case D3D_FEATURE_LEVEL_11_1:
+    case D3D_FEATURE_LEVEL_12_0:
+    case D3D_FEATURE_LEVEL_12_1:
+    case D3D_FEATURE_LEVEL_12_2:
+        m_Features.ShaderModel.Major = 5;
+        m_Features.ShaderModel.Minor = 0;
+        break;
+    default:
+        break;
+    }
+
 }
 
 void
@@ -211,6 +249,15 @@ CRHIDevice_DX11::CreateFrameGraph(const RHIGraphBuilder& builder,
     *outHandle = temp;
 
     return Result::Ok;
+}
+
+void
+CRHIDevice_DX11::GetFeatures(
+    DeviceFeatures* features) {
+    if (!features)
+        return;
+
+    *features = m_Features;
 }
 
 void* const
@@ -763,6 +810,7 @@ CRHIFrameGraph_DX11::Execute(
     CRHISurface_DX11* const dx_surface{ (CRHISurface_DX11* const)surface };
 
     ID3D11DeviceContext4* const ctx{ m_Ctx };
+    RHICommandBuilder builder{ 1024 * 1024 };
 
     for (auto& pass : m_Passes) {
         const u32 num_rtvs{ pass.NumRtvs };
@@ -810,6 +858,9 @@ CRHIFrameGraph_DX11::Execute(
         }
 
         ctx->OMSetRenderTargets(num_rtvs, &targets[0], depth);
+        pass.Func(builder);
+        //PARSE
+        builder.Reset();
     }
 
     dx_surface->Present();

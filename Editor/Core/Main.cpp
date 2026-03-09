@@ -15,7 +15,7 @@ public:
     ~Editor() override = default;
 
     Result::Code PreInitialize() override {
-        RHIGraphicsCmdList cmd{ 1024 * 64 };
+        RHICommandBuilder cmd{ 1024 * 64 };
         cmd.Draw(12, 54);
         cmd.DrawIndexedInstanced(1322, 354, 453, 51, 21);
 

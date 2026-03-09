@@ -3,7 +3,9 @@
 
 #define RHI_TEMPORAL_COUNT_BITS 4
 #define RHI_VIEW_INDEX_BITS 12
+#define RHI_COMMAND_ALIGN 8
 #define RHI_MAX_NAME 128
+#define RHI_MAX_SAMPLERS 128
 #define RHI_MAX_TEMPORAL 1 << RHI_TEMPORAL_COUNT_BITS
 #define RHI_MAX_VIEWS_PER_TYPE (1 << RHI_VIEW_INDEX_BITS) - 1
 #define RHI_MAX_TARGET_COUNT 8
@@ -13,7 +15,7 @@
 #endif
 
 #if RHI_ENABLE_STREAM_CHECK
-#define RHI_VALIDATE_CMD(x) if(!x) { LOG_ERROR("Buffer for commands is full, consider a larger size!"); }
+#define RHI_VALIDATE_CMD(x) if(!x) { LOG_ERROR("Buffer for commands is full, consider a larger size!"); return; }
 #else
 #define RHI_VALIDATE_CMD(x) x
 #endif
@@ -229,6 +231,25 @@ struct ResourceViewType {
     };
 };
 
+struct ShaderType {
+    enum Type : u32 {
+        All = 0,
+        Compute,
+        Graphics,
+        Vertex,
+        Pixel,
+    };
+};
+
+struct PipelineLayoutParamType {
+    enum Type : u32 {
+        ShaderResource = 0,
+        ConstantBuffer,
+        UnorderedAccess,
+        Sampler,
+    };
+};
+
 struct FGResourceType {
     enum Type : u32 {
         Texture = 0,
@@ -250,7 +271,13 @@ struct FGCompileFlags {
         None = 0x00,
         LogInfo = 0x01,
         DebugNames = 0x02,
+        Bindless = 0x04,
     };
+};
+
+struct VersionData {
+    u8                  Major;
+    u8                  Minor;
 };
 
 struct DeviceInitInfo {
@@ -260,6 +287,13 @@ struct DeviceInitInfo {
     //Disabling the GPU timeout is only guaranteed for non-framegraph workloads.
     bool                DisableGPUTimeout;
     u32                 MaxShaderResources;
+};
+
+struct DeviceFeatures {
+    bool                Bindless : 1;
+    bool                PushConstants : 1;
+    VersionData         ShaderModel;
+    VersionData         FeatureLevel;
 };
 
 struct ResourceInitInfo {
@@ -303,6 +337,76 @@ struct ClearValue {
         f32                         Color[4];
         DepthStencilClear           Depth;
     };
+};
+
+struct PipelineLayoutParam {
+    PipelineLayoutParamType::Type   Type{};
+    ShaderType::Type                Visibility{ ShaderType::All };
+    u32                             Slot{};
+    u32                             Space{ 0 };
+    u32                             Count{ 1 };
+    bool                            Bindless{ false };
+
+    constexpr inline void AsSRV(u32 slot, u32 space) {
+        Type = PipelineLayoutParamType::ShaderResource;
+        Slot = slot;
+        Space = space;
+    }
+
+    constexpr inline void AsCBV(u32 slot, u32 space) {
+        Type = PipelineLayoutParamType::ConstantBuffer;
+        Slot = slot;
+        Space = space;
+    }
+
+    constexpr inline void AsUAV(u32 slot, u32 space) {
+        Type = PipelineLayoutParamType::UnorderedAccess;
+        Slot = slot;
+        Space = space;
+    }
+
+    constexpr inline void AsSampler(u32 slot, u32 space) {
+        Type = PipelineLayoutParamType::Sampler;
+        Slot = slot;
+        Space = space;
+    }
+
+    constexpr inline void AsSRVRange(u32 slot, u32 space, u32 count) {
+        Type = PipelineLayoutParamType::ShaderResource;
+        Slot = slot;
+        Space = space;
+        Count = count;
+    }
+
+    constexpr inline void AsCBVRange(u32 slot, u32 space, u32 count) {
+        Type = PipelineLayoutParamType::ConstantBuffer;
+        Slot = slot;
+        Space = space;
+        Count = count;
+    }
+
+    constexpr inline void AsUAVRange(u32 slot, u32 space, u32 count) {
+        Type = PipelineLayoutParamType::UnorderedAccess;
+        Slot = slot;
+        Space = space;
+        Count = count;
+    }
+
+    constexpr inline void AsSamplerRange(u32 slot, u32 space, u32 count) {
+        Type = PipelineLayoutParamType::Sampler;
+        Slot = slot;
+        Space = space;
+        Count = count;
+    }
+};
+
+struct PipelineLayoutInitInfo {
+    u32                             NumParams;
+    PipelineLayoutParam*            Params;
+
+    //TODO: Static samplers
+
+    u32                             PushConstantSize;
 };
 
 struct FGResourceInitInfo {
@@ -393,6 +497,7 @@ class RHIGraphBuilder;
 class IRHIAdapter;
 class IRHIDevice;
 class IRHIResource;
+class IRHIPipelineLayout;
 class IRHISurface;
 class IRHIFrameGraph;
 
@@ -437,6 +542,10 @@ public:
         const ResourceInitInfo& info,
         IRHIResource** resource) = 0;
 
+    virtual Result::Code CreatePipelineLayout(
+        const PipelineLayoutInitInfo& info,
+        IRHIPipelineLayout** outHandle) = 0;
+
     virtual Result::Code CreateSurface(
         const SurfaceInitInfo& info,
         IRHISurface** surface) = 0;
@@ -446,12 +555,23 @@ public:
         u32 flags,
         IRHIFrameGraph** outHandle) = 0;
 
+
+    virtual void GetFeatures(
+        DeviceFeatures* features) = 0;
+
     virtual void* const GetNative() const = 0;
 };
 
 class IRHIResource : public IObjectBase {
 public:
     virtual ~IRHIResource() = default;
+
+    virtual void* const GetNative() const = 0;
+};
+
+class IRHIPipelineLayout : public IObjectBase {
+public:
+    virtual ~IRHIPipelineLayout() = default;
 
     virtual void* const GetNative() const = 0;
 };
@@ -472,8 +592,11 @@ public:
     virtual void Execute(
         IRHISurface* const surface,
         u64 frameNumber) = 0;
+
+    virtual void WaitIdle() = 0;
 };
 
+//TODO: Rework for better clarity
 class RHIGraphBuilder {
     static constexpr u32 InvalidPass = ~0u;
 public:
@@ -564,6 +687,21 @@ public:
         ValidatePass();
         m_BuildingPass = false;
         m_CurrentPass = InvalidPass;
+    }
+
+    void AddDepth(FGResource    resource,
+        RHIFormat::Fmt          viewFormat,
+        u32                     state,
+        SubresourceRange        range = {}) {
+        ValidatePass();
+        AddFlags(resource, (ResourceState::State)state);
+        const FGResourceUsage usage{ resource, (ResourceState::State)state, viewFormat, range, 0 };
+        if (state & ResourceState::DepthRead) {
+            m_Passes[m_CurrentPass].Reads.PushBack(usage);
+        }
+        else {
+            m_Passes[m_CurrentPass].Writes.PushBack(usage);
+        }
     }
 
     void Read(
@@ -686,54 +824,68 @@ private:
     bool                        m_BuildingPass{ false };
 };
 
+//TODO: Remove PayloadSize from CmdHeader
 class RHICommandBuilder {
 public:
     struct CommandId {
-        enum Id : u16 {
+        enum Id : u32 {
             CopyResource,
+            SetGraphicsLayout,
+            SetComputeLayout,
             Draw,
             DrawInstanced,
             DrawIndexed,
             DrawIndexedInstanced,
+            Count
         };
     };
 
     struct CmdHeader
     {
-        u16 Id;
-        u16 Size;
+        u32         Id;
+        u32         PayloadSize;
     };
 
     struct CmdCopyResourceInfo {
-        IRHIResource*   Src;
-        IRHIResource*   Dst;
+        IRHIResource*           Src;
+        IRHIResource*           Dst;
+    };
+
+    struct CmdSetGraphicsLayoutInfo {
+        IRHIPipelineLayout*     Layout;
+    };
+
+    struct CmdSetComputeLayoutInfo {
+        IRHIPipelineLayout*     Layout;
     };
 
     struct CmdDrawInfo {
-        u32         VertexCount;
-        u32         BaseVertex;
+        u32                     VertexCount;
+        u32                     BaseVertex;
     };
 
     struct CmdDrawInstancedInfo {
-        u32         VertexCount;
-        u32         InstanceCount;
-        u32         BaseVertex;
-        u32         BaseInstance;
+        u32                     VertexCount;
+        u32                     InstanceCount;
+        u32                     BaseVertex;
+        u32                     BaseInstance;
     };
 
     struct CmdDrawIndexedInfo {
-        u32         IndexCount;
-        u32         BaseIndex;
-        u32         BaseVertex;
+        u32                     IndexCount;
+        u32                     BaseIndex;
+        u32                     BaseVertex;
     };
 
     struct CmdDrawInstancedIndexedInfo {
-        u32         IndexCount;
-        u32         InstanceCount;
-        u32         BaseIndex;
-        u32         BaseVertex;
-        u32         BaseInstance;
+        u32                     IndexCount;
+        u32                     InstanceCount;
+        u32                     BaseIndex;
+        u32                     BaseVertex;
+        u32                     BaseInstance;
     };
+
+    static_assert(sizeof(CmdHeader) == RHI_COMMAND_ALIGN, "Invalid command align");
 
 public:
     RHICommandBuilder(u32 capacity)
@@ -755,38 +907,26 @@ public:
     }
 
     template<typename T>
-    bool Allocate(u16 id, const T& cmd)
-    {
-        constexpr u32 headerAlign{ alignof(CmdHeader) };
-        constexpr u32 payloadAlign{ alignof(T) };
-
-        const u32 alignedOffset{ Math::AlignUp(m_Offset, headerAlign) };
+    T* Allocate(u32 id) {
+        constexpr u32 aligned_payload_size{ Math::AlignUp((u32)sizeof(T), (u32)RHI_COMMAND_ALIGN) };
+        const u32 total{ sizeof(CmdHeader) + aligned_payload_size };
 
 #if RHI_ENABLE_STREAM_CHECK
-        const u32 total{
-            (alignedOffset - m_Offset) +
-            sizeof(CmdHeader) +
-            Math::AlignUp((u32)sizeof(T), payloadAlign) };
-
-        if (!m_Stream || alignedOffset + total > m_Capacity)
-        {
+        if (!m_Stream || m_Offset + total > m_Capacity) {
             LOG_ERROR("No command stream memory!");
-            return false;
+            return nullptr;
         }
 #endif
 
-        m_Offset = alignedOffset;
+        auto* header = (CmdHeader*)(m_Stream + m_Offset);
+        header->Id = id;
+        header->PayloadSize = aligned_payload_size;
 
-        CmdHeader header{ id, sizeof(T) };
-        MemCopy(m_Stream + m_Offset, &header, sizeof(header));
-        m_Offset += sizeof(header);
+        T* payload = (T*)(header + 1);
 
-        m_Offset = Math::AlignUp(m_Offset, payloadAlign);
+        m_Offset += total;
 
-        MemCopy(m_Stream + m_Offset, &cmd, sizeof(T));
-        m_Offset += sizeof(T);
-
-        return true;
+        return payload;
     }
 
     void Reset() { m_Offset = 0; }
@@ -803,59 +943,55 @@ public:
         return m_Capacity;
     }
 
-private:
-    u8*         m_Stream;
-    u32         m_Offset;
-    u32         m_Capacity;
-};
-
-class RHITransferCommandList : public RHICommandBuilder {
 public:
     inline void CopyResource(IRHIResource* Src,
         IRHIResource* Dst) {
-        RHI_VALIDATE_CMD(Allocate(CommandId::CopyResource,
-            CmdCopyResourceInfo{
-                Src,
-                Dst
-            }))
+        auto* cmd{ Allocate<CmdCopyResourceInfo>(CommandId::CopyResource) };
+        RHI_VALIDATE_CMD(cmd);
+        cmd->Src = Src;
+        cmd->Dst = Dst;
     }
-};
 
-class RHIComputeCommandList : public RHITransferCommandList {
-public:
+    inline void SetGraphicsLayout(IRHIPipelineLayout* layout) {
+        auto* cmd{ Allocate<CmdSetGraphicsLayoutInfo>(CommandId::SetGraphicsLayout) };
+        RHI_VALIDATE_CMD(cmd);
+        cmd->Layout = layout;
+    }
 
-};
+    inline void SetComputeLayout(IRHIPipelineLayout* layout) {
+        auto* cmd{ Allocate<CmdSetComputeLayoutInfo>(CommandId::SetComputeLayout) };
+        RHI_VALIDATE_CMD(cmd);
+        cmd->Layout = layout;
+    }
 
-class RHIGraphicsCmdList : public RHIComputeCommandList {
-public:
     inline void Draw(u32 VertexCount,
         u32 BaseVertex) {
-        RHI_VALIDATE_CMD(Allocate(CommandId::Draw, CmdDrawInfo{
-            VertexCount,
-            BaseVertex
-            }))
+        auto* cmd{ Allocate<CmdDrawInfo>(CommandId::Draw) };
+        RHI_VALIDATE_CMD(cmd);
+        cmd->VertexCount = VertexCount;
+        cmd->BaseVertex = BaseVertex;
     }
 
     inline void DrawInstanced(u32 VertexCount,
         u32 InstanceCount,
         u32 BaseVertex,
         u32 BaseInstance) {
-        RHI_VALIDATE_CMD(Allocate(CommandId::DrawInstanced, CmdDrawInstancedInfo{
-            VertexCount,
-            InstanceCount,
-            BaseVertex,
-            BaseInstance
-            }))
+        auto* cmd{ Allocate<CmdDrawInstancedInfo>(CommandId::DrawInstanced) };
+        RHI_VALIDATE_CMD(cmd);
+        cmd->VertexCount = VertexCount;
+        cmd->InstanceCount = InstanceCount;
+        cmd->BaseVertex = BaseVertex;
+        cmd->BaseInstance = BaseInstance;
     }
 
     inline void DrawIndexed(u32 IndexCount,
         u32 BaseIndex,
         u32 BaseVertex) {
-        RHI_VALIDATE_CMD(Allocate(CommandId::DrawIndexed, CmdDrawIndexedInfo{
-            IndexCount,
-            BaseIndex,
-            BaseVertex
-            }))
+        auto* cmd{ Allocate<CmdDrawIndexedInfo>(CommandId::DrawIndexed) };
+        RHI_VALIDATE_CMD(cmd);
+        cmd->IndexCount = IndexCount;
+        cmd->BaseIndex = BaseIndex;
+        cmd->BaseVertex = BaseVertex;
     }
 
     inline void DrawIndexedInstanced(u32 IndexCount,
@@ -863,13 +999,18 @@ public:
         u32 BaseIndex,
         u32 BaseVertex,
         u32 BaseInstance) {
-        RHI_VALIDATE_CMD(Allocate(CommandId::DrawIndexedInstanced, CmdDrawInstancedIndexedInfo{
-            IndexCount,
-            InstanceCount,
-            BaseIndex,
-            BaseVertex,
-            BaseInstance
-            }))
+        auto* cmd{ Allocate<CmdDrawInstancedIndexedInfo>(CommandId::DrawIndexedInstanced) };
+        RHI_VALIDATE_CMD(cmd);
+        cmd->IndexCount = IndexCount;
+        cmd->InstanceCount = InstanceCount;
+        cmd->BaseIndex = BaseIndex;
+        cmd->BaseVertex = BaseVertex;
+        cmd->BaseInstance = BaseInstance;
     }
+
+private:
+    u8*         m_Stream;
+    u32         m_Offset;
+    u32         m_Capacity;
 };
 }

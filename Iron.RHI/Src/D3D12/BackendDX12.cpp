@@ -84,6 +84,20 @@ ConvertResourceStates(ResourceState::State state)
     return val;
 }
 
+constexpr static D3D12_SHADER_VISIBILITY
+ConvertVisibility(ShaderType::Type vis) {
+    switch (vis)     {
+    case ShaderType::Vertex:
+        return D3D12_SHADER_VISIBILITY_VERTEX;
+    case ShaderType::Pixel:
+        return D3D12_SHADER_VISIBILITY_PIXEL;
+    case ShaderType::Compute:
+        return D3D12_SHADER_VISIBILITY_ALL;
+    default:
+        return D3D12_SHADER_VISIBILITY_ALL;
+    }
+}
+
 unsigned int CeilLog2(unsigned int x) {
     if (x == 0) {
         return 0;
@@ -116,6 +130,95 @@ std::wstring
 ToWideString(std::string str) {
     return { str.begin(), str.end() };
 }
+
+namespace Cmd {
+struct CommandListData {
+    ID3D12GraphicsCommandList10*    List{};
+
+    bool                            GraphicsLayout{};
+
+    u32                             CounterDraw;
+    u32                             CounterDrawInstanced;
+    u32                             CounterDrawIndexed;
+    u32                             CounterDrawIndexedInstanced;
+};
+
+typedef void(*CommandFunc)(CommandListData&, const void*);
+
+void
+SetGraphicsLayout(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdSetGraphicsLayoutInfo& info{ *(const RHICommandBuilder::CmdSetGraphicsLayoutInfo*)data };
+    cmdData.List->SetGraphicsRootSignature((ID3D12RootSignature*)info.Layout->GetNative());
+    cmdData.GraphicsLayout = true;
+}
+
+void
+SetComputeLayout(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdSetGraphicsLayoutInfo& info{ *(const RHICommandBuilder::CmdSetGraphicsLayoutInfo*)data };
+    cmdData.List->SetComputeRootSignature((ID3D12RootSignature*)info.Layout->GetNative());
+    cmdData.GraphicsLayout = false;
+}
+
+void
+Draw(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdDrawInfo& info{ *(const RHICommandBuilder::CmdDrawInfo*)data };
+    cmdData.List->DrawInstanced(info.VertexCount, 1, info.BaseVertex, 0);
+    ++cmdData.CounterDraw;
+}
+
+void
+DrawInstanced(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdDrawInstancedInfo& info{ *(const RHICommandBuilder::CmdDrawInstancedInfo*)data };
+    cmdData.List->DrawInstanced(info.VertexCount, info.InstanceCount, info.BaseVertex, info.BaseInstance);
+    ++cmdData.CounterDrawInstanced;
+}
+
+void
+DrawIndexed(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdDrawIndexedInfo& info{ *(const RHICommandBuilder::CmdDrawIndexedInfo*)data };
+    cmdData.List->DrawIndexedInstanced(info.IndexCount, 1, info.BaseIndex, info.BaseVertex, 0);
+    ++cmdData.CounterDrawIndexed;
+}
+
+void
+DrawIndexedInstanced(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdDrawInstancedIndexedInfo& info{ *(const RHICommandBuilder::CmdDrawInstancedIndexedInfo*)data };
+    cmdData.List->DrawIndexedInstanced(info.IndexCount, info.InstanceCount, info.BaseIndex, info.BaseVertex, info.BaseInstance);
+    ++cmdData.CounterDrawIndexedInstanced;
+}
+
+constexpr static CommandFunc DispatchTable[RHICommandBuilder::CommandId::Count]{
+    nullptr,
+    SetGraphicsLayout,
+    SetComputeLayout,
+    Draw,
+    DrawInstanced,
+    DrawIndexed,
+    DrawIndexedInstanced,
+};
+
+void
+ParseCommandStream(RHICommandBuilder& builder, CommandListData& cmdData) {
+    if (!(builder.GetStream() && cmdData.List)) {
+        return;
+    }
+
+    const u32 total_size{ builder.GetOffset() };
+    const u8* stream{ builder.GetStream() };
+    const u8* const end{ stream + total_size };
+
+    while (stream < end) {
+        const RHICommandBuilder::CmdHeader header{ *(const RHICommandBuilder::CmdHeader*)stream };
+        if (header.Id >= RHICommandBuilder::CommandId::Count) {
+            LOG_ERROR("Invalid command id used!");
+        }
+
+        stream += sizeof(RHICommandBuilder::CmdHeader);
+        DispatchTable[header.Id](cmdData, stream);
+        stream += header.PayloadSize;
+    }
+}
+}//cmd namespace
 }//anonymous namespace
 
 bool
@@ -464,7 +567,9 @@ CRHIDevice_DX12::CRHIDevice_DX12(
     m_Device(),
     m_GraphicsQueue(),
     m_BufferHeaps(),
-    m_SrvHeap() {
+    m_SrvHeap(),
+    m_SerializeRootSig(),
+    m_Features() {
 
     if (!(adapter && m_Factory)) {
         LOG_ERROR("Invalid adapter/factory given to device!");
@@ -479,8 +584,10 @@ CRHIDevice_DX12::CRHIDevice_DX12(
 
     m_D3D12CreateDevice = (PFN_D3D12_CREATE_DEVICE)GetProcAddress(m_D3D12Dll, "D3D12CreateDevice");
     m_D3D12GetDebugInterface = (PFN_D3D12_GET_DEBUG_INTERFACE)GetProcAddress(m_D3D12Dll, "D3D12GetDebugInterface");
-    if (!(m_D3D12CreateDevice && m_D3D12GetDebugInterface)) {
-        LOG_FATAL("Failed to get D3D12CreateDevice() and/or D3D12GetDebugInterface() from d3d12.dll!");
+    m_SerializeRootSig = (PFN_D3D12_SERIALIZE_VERSIONED_ROOT_SIGNATURE)GetProcAddress(m_D3D12Dll, "D3D12SerializeVersionedRootSignature");
+    if (!(m_D3D12CreateDevice && m_D3D12GetDebugInterface
+        && m_SerializeRootSig)) {
+        LOG_FATAL("Failed to get D3D12CreateDevice() and/or D3D12GetDebugInterface() and/or D3D12SerializeVersionedRootSignature() from d3d12.dll!");
         return;
     }
 
@@ -534,6 +641,17 @@ CRHIDevice_DX12::CRHIDevice_DX12(
 
     m_BufferHeaps.Initialize(m_Device, ResourceUsage::Default);
     m_SrvHeap.Initialize(m_Device, info.MaxShaderResources, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true);
+
+    D3D12_FEATURE_DATA_D3D12_OPTIONS d3d12_options{ QueryFeatureSupport<D3D12_FEATURE_DATA_D3D12_OPTIONS>() };
+    D3D12_FEATURE_DATA_SHADER_MODEL shader_model{ QueryFeatureSupport<D3D12_FEATURE_DATA_SHADER_MODEL>() };
+
+    m_Features.Bindless = (d3d12_options.ResourceBindingTier == D3D12_RESOURCE_BINDING_TIER_3
+        && shader_model.HighestShaderModel >= D3D_SHADER_MODEL_6_0);
+    m_Features.PushConstants = true;
+    m_Features.ShaderModel.Major = (shader_model.HighestShaderModel & 0xf0) >> 4;
+    m_Features.ShaderModel.Minor = shader_model.HighestShaderModel & 0xf;
+    m_Features.FeatureLevel.Major = ((m_FeatureLevel >> 8) & 0xf0) >> 4;
+    m_Features.FeatureLevel.Minor = (m_FeatureLevel >> 8) & 0xf;
 }
 
 void
@@ -624,9 +742,26 @@ CRHIDevice_DX12::CreateResource(const ResourceInitInfo& info,
 }
 
 Result::Code
+CRHIDevice_DX12::CreatePipelineLayout(const PipelineLayoutInitInfo& info,
+    IRHIPipelineLayout** outHandle) {
+    CRHIPipelineLayout_DX12* temp{ new CRHIPipelineLayout_DX12(this, info) };
+    if (!temp) {
+        return Result::ENomemory;
+    }
+
+    if (!temp->GetNative()) {
+        delete temp;
+        return Result::ECreateRHIObject;
+    }
+
+    *outHandle = temp;
+
+    return Result::Ok;
+}
+
+Result::Code
 CRHIDevice_DX12::CreateSurface(const SurfaceInitInfo& info,
-    IRHISurface** surface)
-{
+    IRHISurface** surface) {
     CRHISurface_DX12* temp{ new CRHISurface_DX12(this, m_Factory, info) };
     if (!temp) {
         return Result::ENomemory;
@@ -645,8 +780,7 @@ CRHIDevice_DX12::CreateSurface(const SurfaceInitInfo& info,
 Result::Code
 CRHIDevice_DX12::CreateFrameGraph(const RHIGraphBuilder& builder,
     u32 flags,
-    IRHIFrameGraph** outHandle)
-{
+    IRHIFrameGraph** outHandle) {
     CRHIFrameGraph_DX12* temp{ new CRHIFrameGraph_DX12() };
     if (!temp) {
         return Result::ENomemory;
@@ -663,6 +797,15 @@ CRHIDevice_DX12::CreateFrameGraph(const RHIGraphBuilder& builder,
     *outHandle = temp;
 
     return Result::Ok;
+}
+
+void
+CRHIDevice_DX12::GetFeatures(
+    DeviceFeatures* features) {
+    if (!features)
+        return;
+
+    *features = m_Features;
 }
 
 void* const
@@ -718,6 +861,137 @@ CRHIResource_DX12::Release() {
 void* const
 CRHIResource_DX12::GetNative() const {
     return m_Resource;
+}
+
+CRHIPipelineLayout_DX12::CRHIPipelineLayout_DX12(
+    CRHIDevice_DX12* const device,
+    const PipelineLayoutInitInfo& info)
+    : m_RootSig() {
+    if (!(device && device->GetNative())) {
+        return;
+    }
+
+    std::vector<D3D12_ROOT_PARAMETER> rootParams;
+    std::vector<D3D12_DESCRIPTOR_RANGE> ranges;
+
+    for (u32 i{ 0 }; i < info.NumParams; ++i) {
+        const auto& param = info.Params[i];
+
+        D3D12_ROOT_PARAMETER root{};
+        root.ShaderVisibility = ConvertVisibility(param.Visibility);
+
+        bool isTable = param.Count > 1 || param.Bindless;
+
+        if (!isTable) {
+            switch (param.Type) {
+            case PipelineLayoutParamType::ConstantBuffer:
+                root.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+                root.Descriptor.ShaderRegister = param.Slot;
+                root.Descriptor.RegisterSpace = param.Space;
+                break;
+
+            case PipelineLayoutParamType::ShaderResource:
+                root.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+                root.Descriptor.ShaderRegister = param.Slot;
+                root.Descriptor.RegisterSpace = param.Space;
+                break;
+
+            case PipelineLayoutParamType::UnorderedAccess:
+                root.ParameterType = D3D12_ROOT_PARAMETER_TYPE_UAV;
+                root.Descriptor.ShaderRegister = param.Slot;
+                root.Descriptor.RegisterSpace = param.Space;
+                break;
+            }
+
+            rootParams.push_back(root);
+        }
+        else {
+            D3D12_DESCRIPTOR_RANGE range{};
+            range.BaseShaderRegister = param.Slot;
+            range.RegisterSpace = param.Space;
+            range.NumDescriptors = param.Bindless ? UINT_MAX : param.Count;
+            range.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+            switch (param.Type) {
+            case PipelineLayoutParamType::ShaderResource:
+                range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+                break;
+
+            case PipelineLayoutParamType::ConstantBuffer:
+                range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+                break;
+
+            case PipelineLayoutParamType::UnorderedAccess:
+                range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+                break;
+
+            case PipelineLayoutParamType::Sampler:
+                range.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+                break;
+            }
+
+            ranges.push_back(range);
+
+            root.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+            root.DescriptorTable.NumDescriptorRanges = 1;
+            root.DescriptorTable.pDescriptorRanges = &ranges.back();
+
+            rootParams.push_back(root);
+        }
+    }
+
+    if (info.PushConstantSize)
+    {
+        D3D12_ROOT_PARAMETER root{};
+        root.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        root.Constants.Num32BitValues = info.PushConstantSize / 4;
+        root.Constants.ShaderRegister = 0;
+        root.Constants.RegisterSpace = 0;
+        root.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+
+        rootParams.push_back(root);
+    }
+
+    D3D12_VERSIONED_ROOT_SIGNATURE_DESC desc{};
+    desc.Version = D3D_ROOT_SIGNATURE_VERSION_1;
+    desc.Desc_1_0.NumParameters = (UINT)rootParams.size();
+    desc.Desc_1_0.pParameters = rootParams.data();
+    desc.Desc_1_0.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
+
+    ComPtr<ID3DBlob> blob;
+    ComPtr<ID3DBlob> error;
+
+    HRESULT hr{ S_OK };
+    hr = device->D3D12SerializeVersionedRootSignature(
+        &desc,
+        &blob,
+        &error);
+    if (FAILED(hr)) {
+        if (error) {
+            LOG_ERROR("RootSig Error: %s", (char*)error->GetBufferPointer());
+        }
+
+        return;
+    }
+
+    ID3D12Device14* const d3d12{ (ID3D12Device14* const)device->GetNative() };
+
+    hr = d3d12->CreateRootSignature(
+        0,
+        blob->GetBufferPointer(),
+        blob->GetBufferSize(),
+        IID_PPV_ARGS(&m_RootSig)
+    );
+}
+
+void
+CRHIPipelineLayout_DX12::Release() {
+    SafeRelease(m_RootSig);
+}
+
+void* const
+CRHIPipelineLayout_DX12::GetNative() const {
+    return m_RootSig;
 }
 
 CRHISurface_DX12::CRHISurface_DX12(
@@ -1326,11 +1600,16 @@ CRHIFrameGraph_DX12::Execute(
 
     m_Queue.Begin();
 
-    ID3D12GraphicsCommandList10* const cmd{ m_Queue.List };
+    Cmd::CommandListData cmd_data{};
+    cmd_data.List = m_Queue.List;
+    //Dont realloc every frame!
+    RHICommandBuilder builder{ 1024 * 1024 };
+    builder.Reset();
+
     ID3D12Resource* const surface_buffer{ (ID3D12Resource* const)dx_surface->GetNativeBuffer(dx_surface->GetCurrentBBIndex()) };
     D3D12_RESOURCE_STATES last_surface_state{};
     DX12Barriers barriers{};
-
+    
     for (const auto& pass : m_Passes) {
         const u32 num_rtvs{ pass.NumRtvs };
         const bool has_dsv{ (bool)pass.HasDsv };
@@ -1359,7 +1638,7 @@ CRHIFrameGraph_DX12::Execute(
                 barriers.Add(b);
             }
 
-            barriers.Apply(cmd);
+            barriers.Apply(cmd_data.List);
         }
 
         D3D12_CPU_DESCRIPTOR_HANDLE targets[RHI_MAX_TARGET_COUNT]{};
@@ -1380,7 +1659,7 @@ CRHIFrameGraph_DX12::Execute(
             }
 
             if (pass.HasTargetClear(i)) {
-                cmd->ClearRenderTargetView(targets[i],
+                cmd_data.List->ClearRenderTargetView(targets[i],
                     &pass.RtvClearValues[i].X,
                     0,
                     nullptr);
@@ -1397,7 +1676,7 @@ CRHIFrameGraph_DX12::Execute(
             depth = m_DsvHeap.GetCpuHandle(actual_index);
             if (pass.HasDepthClear()) {
                 //TODO: Only depth or stencil???
-                cmd->ClearDepthStencilView(depth,
+                cmd_data.List->ClearDepthStencilView(depth,
                     D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL,
                     pass.DepthClearValue.Depth,
                     pass.DepthClearValue.Stencil,
@@ -1406,7 +1685,11 @@ CRHIFrameGraph_DX12::Execute(
             }
         }
 
-        cmd->OMSetRenderTargets(num_rtvs, &targets[0], FALSE, has_dsv ? &depth : nullptr);
+        cmd_data.List->OMSetRenderTargets(num_rtvs, &targets[0], FALSE, has_dsv ? &depth : nullptr);
+
+        pass.Func(builder);
+        Cmd::ParseCommandStream(builder, cmd_data);
+        builder.Reset();
     }
 
     D3D12_RESOURCE_BARRIER present_barrier{};
@@ -1416,11 +1699,16 @@ CRHIFrameGraph_DX12::Execute(
     present_barrier.Transition.Subresource = 0;
     present_barrier.Transition.StateBefore = last_surface_state;
     present_barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-    
+
     barriers.Add(present_barrier);
-    barriers.Apply(cmd);
+    barriers.Apply(cmd_data.List);
 
     m_Queue.End(dx_surface);
+}
+
+void
+CRHIFrameGraph_DX12::WaitIdle() {
+    m_Queue.Flush();
 }
 
 

@@ -10,6 +10,170 @@ namespace Iron::RHI::D3D12 {
 constexpr static u64 Alignment64KB{ 1 << 16 };
 constexpr static u64 Alignment4MB{ 1 << 22 };
 
+template<typename T>
+struct D3D12FeatureTraits {
+    static void PreQuery(T&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS1> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS1;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS1&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS2> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS2;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS2&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS3> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS3;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS3&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS4> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS4;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS4&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS5> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS5;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS5&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS6> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS6;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS6&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS7> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS7;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS7&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS8> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS8;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS8&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS9> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS9;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS9&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS10> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS10;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS10&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS11> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS11;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS11&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS12> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS12;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS12&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS13> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS13;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS13&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS14> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS14;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS14&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS15> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS15;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS15&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS16> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS16;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS16&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS17> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS17;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS17&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS18> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS18;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS18&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS19> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS19;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS19&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS20> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS20;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS20&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_D3D12_OPTIONS21> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_D3D12_OPTIONS21;
+    static void PreQuery(D3D12_FEATURE_DATA_D3D12_OPTIONS21&) {}
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_FEATURE_LEVELS> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_FEATURE_LEVELS;
+
+    static void PreQuery(D3D12_FEATURE_DATA_FEATURE_LEVELS& data) {
+        constexpr static D3D_FEATURE_LEVEL levels[]{
+            D3D_FEATURE_LEVEL_12_2,
+            D3D_FEATURE_LEVEL_12_1,
+            D3D_FEATURE_LEVEL_12_0,
+            D3D_FEATURE_LEVEL_11_1,
+            D3D_FEATURE_LEVEL_11_0,
+        };
+
+        data.NumFeatureLevels = _countof(levels);
+        data.pFeatureLevelsRequested = &levels[0];
+    }
+};
+
+template<>
+struct D3D12FeatureTraits<D3D12_FEATURE_DATA_SHADER_MODEL> {
+    static constexpr D3D12_FEATURE Feature = D3D12_FEATURE_SHADER_MODEL;
+
+    static void PreQuery(D3D12_FEATURE_DATA_SHADER_MODEL& data) {
+        data.HighestShaderModel = D3D_SHADER_MODEL_6_9;
+    }
+};
+
 struct HeapAllocInfo {
     ID3D12Heap* const       Heap;
     u64                     Offset;
@@ -128,7 +292,7 @@ public:
             return;
 
         cmd->ResourceBarrier(m_Current, &m_Barriers[0]);
-        
+
         Reset();
     }
 
@@ -155,6 +319,10 @@ public:
         const ResourceInitInfo& info,
         IRHIResource** resource) override;
 
+    Result::Code CreatePipelineLayout(
+        const PipelineLayoutInitInfo& info,
+        IRHIPipelineLayout** outHandle) override;
+
     Result::Code CreateSurface(
         const SurfaceInitInfo& info,
         IRHISurface** surface) override;
@@ -163,6 +331,9 @@ public:
         const RHIGraphBuilder& builder,
         u32 flags,
         IRHIFrameGraph** outHandle) override;
+
+    void GetFeatures(
+        DeviceFeatures* features) override;
 
     void* const GetNative() const override;
 
@@ -174,22 +345,52 @@ public:
         return m_SrvHeap;
     }
 
+    template<typename T>
+    T QueryFeatureSupport() {
+        if (!m_Device)
+            return T();
+
+        T data{};
+        D3D12FeatureTraits<T>::PreQuery(data);
+
+        HRESULT hr{ m_Device->CheckFeatureSupport(
+            D3D12FeatureTraits<T>::Feature, &data,
+            sizeof(T)) };
+        if (FAILED(hr))
+            return T();
+
+        return data;
+    }
+
+    HRESULT D3D12SerializeVersionedRootSignature(
+        const D3D12_VERSIONED_ROOT_SIGNATURE_DESC* pRootSignature,
+        ID3DBlob** ppBlob,
+        ID3DBlob** ppErrorBlob) {
+        if (!m_SerializeRootSig) {
+            return E_NOINTERFACE;
+        }
+
+        return m_SerializeRootSig(pRootSignature, ppBlob, ppErrorBlob);
+    }
+
 private:
     D3D_FEATURE_LEVEL _GetMaximumFL(IUnknown* const adapter) const;
 
-    IRHIFactory*                    m_Factory;
-    bool                            m_Debug;
+    IRHIFactory*                                    m_Factory;
+    bool                                            m_Debug;
 
-    HMODULE                         m_D3D12Dll;
-    PFN_D3D12_CREATE_DEVICE         m_D3D12CreateDevice;
-    PFN_D3D12_GET_DEBUG_INTERFACE   m_D3D12GetDebugInterface;
-    D3D_FEATURE_LEVEL               m_FeatureLevel;
+    HMODULE                                         m_D3D12Dll;
+    PFN_D3D12_CREATE_DEVICE                         m_D3D12CreateDevice;
+    PFN_D3D12_GET_DEBUG_INTERFACE                   m_D3D12GetDebugInterface;
+    PFN_D3D12_SERIALIZE_VERSIONED_ROOT_SIGNATURE    m_SerializeRootSig;
+    D3D_FEATURE_LEVEL                               m_FeatureLevel;
+    DeviceFeatures                                  m_Features;
 
-    ID3D12Device14*                 m_Device;
-    ID3D12CommandQueue*             m_GraphicsQueue;
+    ID3D12Device14*                                 m_Device;
+    ID3D12CommandQueue*                             m_GraphicsQueue;
 
-    DX12BuddyAllocator              m_BufferHeaps;
-    DX12DescriptorHeap              m_SrvHeap;
+    DX12BuddyAllocator                              m_BufferHeaps;
+    DX12DescriptorHeap                              m_SrvHeap;
 };
 
 class CRHIResource_DX12 : public IRHIResource {
@@ -213,6 +414,19 @@ private:
             HeapAllocInfo           m_BufferAlloc;
         } Buffer;
     };
+};
+
+class CRHIPipelineLayout_DX12 : public IRHIPipelineLayout {
+public:
+    CRHIPipelineLayout_DX12(
+        CRHIDevice_DX12* const device,
+        const PipelineLayoutInitInfo& info);
+
+    void Release() override;
+    void* const GetNative() const override;
+
+private:
+    ID3D12RootSignature*    m_RootSig;
 };
 
 class CRHISurface_DX12 : public IRHISurface {
@@ -307,7 +521,8 @@ class CRHIFrameGraph_DX12 : public IRHIFrameGraph {
         Vector<BoundView>       Srvs{};
         Vector<BarrierDesc>     Barriers{};
 
-        FGPassFunc              Func{};
+        FGPassFunc                  Func{};
+        CRHIPipelineLayout_DX12*    RootSig{};
 
         constexpr inline void EnableClearTarget(u16 slot) {
             ClearedBinds |= (1 << (slot + 1));
@@ -484,6 +699,8 @@ public:
         IRHISurface* const surface,
         u64 frameNumber) override;
 
+    void WaitIdle() override;
+
 private:
     Vector<Vector<u32>> GetDependencies(const RHIGraphBuilder& builder) const;
     Vector<u32> TopologicalSort(const Vector<Vector<u32>>& dependencies) const;
@@ -494,21 +711,21 @@ private:
     }
 
 private:
-    Vector<Pass>                        m_Passes;
-    Vector<Resource>                    m_DescResources;
-    Vector<View>                        m_DescViews;
-    Vector<ID3D12Resource*>             m_Resources;
+    Vector<Pass>                        m_Passes{};
+    Vector<Resource>                    m_DescResources{};
+    Vector<View>                        m_DescViews{};
+    Vector<ID3D12Resource*>             m_Resources{};
 
-    CommandQueue                        m_Queue;
-    MemoryHeap                          m_Heap;
-    DX12DescriptorHeap                  m_RtvHeap;
-    DX12DescriptorHeap                  m_DsvHeap;
+    CommandQueue                        m_Queue{};
+    MemoryHeap                          m_Heap{};
+    DX12DescriptorHeap                  m_RtvHeap{};
+    DX12DescriptorHeap                  m_DsvHeap{};
 
     struct {
-        D3D12_CPU_DESCRIPTOR_HANDLE     CpuStart;
-        D3D12_GPU_DESCRIPTOR_HANDLE     GpuStart;
-        u32                             Start;
-        u32                             Count;
-    } m_SrvHeapData;
+        D3D12_CPU_DESCRIPTOR_HANDLE     CpuStart{};
+        D3D12_GPU_DESCRIPTOR_HANDLE     GpuStart{};
+        u32                             Start{};
+        u32                             Count{};
+    } m_SrvHeapData{};
 };
 }
