@@ -8,7 +8,6 @@
 #endif
 
 namespace Iron {
-
 typedef u64 ModuleId;
 
 struct EngineAPI {

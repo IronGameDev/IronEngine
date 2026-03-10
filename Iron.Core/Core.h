@@ -99,6 +99,7 @@ struct Result {
         ECreateView,
         ENotInitialized,
         EFrameGraph,
+        EShaderError,
 
         Count,
     };

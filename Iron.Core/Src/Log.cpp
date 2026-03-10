@@ -29,6 +29,7 @@ constexpr static const char* g_Errors[Result::Count]{
     "ECreateView",
     "ENotInitialized",
     "EFrameGraph",
+    "EShaderError",
 };
 
 } // anonymous namespace

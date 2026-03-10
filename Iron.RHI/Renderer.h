@@ -409,6 +409,9 @@ struct PipelineLayoutInitInfo {
     u32                             PushConstantSize;
 };
 
+struct ComputePipelineInitInfo {
+};
+
 struct FGResourceInitInfo {
     const char*                     Name;
     FGResourceType::Type            Type{};
@@ -498,6 +501,7 @@ class IRHIAdapter;
 class IRHIDevice;
 class IRHIResource;
 class IRHIPipelineLayout;
+class IRHIPipeline;
 class IRHISurface;
 class IRHIFrameGraph;
 
@@ -546,6 +550,10 @@ public:
         const PipelineLayoutInitInfo& info,
         IRHIPipelineLayout** outHandle) = 0;
 
+    //virtual Result::Code CreateComputePipeline(
+    //    const ComputePipelineInitInfo& info,
+    //    IRHIPipelineLayout** outHandle) = 0;
+
     virtual Result::Code CreateSurface(
         const SurfaceInitInfo& info,
         IRHISurface** surface) = 0;
@@ -572,6 +580,13 @@ public:
 class IRHIPipelineLayout : public IObjectBase {
 public:
     virtual ~IRHIPipelineLayout() = default;
+
+    virtual void* const GetNative() const = 0;
+};
+
+class IRHIPipeline : public IObjectBase {
+public:
+    virtual ~IRHIPipeline() = default;
 
     virtual void* const GetNative() const = 0;
 };
