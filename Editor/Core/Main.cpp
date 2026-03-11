@@ -1,7 +1,7 @@
 #include <Iron.Core/Core.h>
 #include <Iron.Engine/Engine.h>
 #include <Iron.Windowing/Windowing.h>
-#include <Iron.RHI/Renderer.h>
+#include <Iron.RHI/RHI.h>
 
 #pragma comment(lib, "iron.core.lib")
 #pragma comment(lib, "iron.engine.lib")

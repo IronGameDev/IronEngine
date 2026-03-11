@@ -1,6 +1,6 @@
 #pragma once
 #include <Iron.Engine/Engine.h>
-#include <Iron.RHI/Renderer.h>
+#include <Iron.RHI/RHI.h>
 #include <Iron.Windowing/Windowing.h>
 
 namespace Iron {

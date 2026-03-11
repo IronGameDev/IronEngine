@@ -29,7 +29,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Renderer.h">
+    <ClInclude Include="RHI.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Src\D3D11\BackendDX11.h">
@@ -39,6 +39,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Src\Shared\Shared.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RHIDefines.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

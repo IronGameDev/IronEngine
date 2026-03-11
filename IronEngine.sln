@@ -31,6 +31,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	ProjectSection(SolutionItems) = preProject
 		iron.ico = iron.ico
 		settings.ini = settings.ini
+		TODO.txt = TODO.txt
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Iron.RHI", "Iron.RHI\Iron.RHI.vcxproj", "{AF023159-8A20-44AD-8C6B-40A1B3282B0C}"

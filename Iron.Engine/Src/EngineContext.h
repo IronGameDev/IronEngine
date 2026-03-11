@@ -3,7 +3,7 @@
 #include <Iron.Engine/Src/Modules/Modules.h>
 #include <Iron.Engine/Src/Renderer/Renderer.h>
 #include <Iron.Windowing/Windowing.h>
-#include <Iron.RHI/Renderer.h>
+#include <Iron.RHI/RHI.h>
 
 #include <filesystem>
 
