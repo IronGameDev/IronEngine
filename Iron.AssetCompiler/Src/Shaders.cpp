@@ -6,6 +6,27 @@ ToWideString(std::string str) {
     return { str.begin(), str.end() };
 }
 
+Result::Code
+CShader::SaveToFile(const char* filePath) {
+    if (!filePath) {
+        return Result::ENullptr;
+    }
+
+    const u64 total_size{ sizeof(u32) + m_Size };
+
+    u8* buffer{ (u8*)MemAlloc(total_size) };
+    if (!buffer) {
+        return Result::ENomemory;
+    }
+
+    *(u32*)buffer = AssetType::Shader;
+    MemCopy(buffer + sizeof(u32), m_Blob, m_Size);
+
+    Result::Code res{ WriteFile(filePath, buffer, total_size) };
+
+    return res;
+}
+
 CShaderCompilerD3D::CShaderCompilerD3D(
     Version shaderVersion)
     : m_ShaderVersion(shaderVersion) {

@@ -11,7 +11,6 @@
 using Microsoft::WRL::ComPtr;
 
 namespace Iron::AssetCompiler {
-
 class CShader : public IShader {
 public:
     CShader(u8* blob, u64 size)
@@ -25,6 +24,9 @@ public:
         m_Blob = nullptr;
         m_Size = 0;
     }
+
+    Result::Code SaveToFile(
+        const char* filePath) override;
 
     u8* const GetData() override {
         return m_Blob;

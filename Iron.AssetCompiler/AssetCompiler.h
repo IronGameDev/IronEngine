@@ -2,6 +2,15 @@
 #include <Iron.Core/Core.h>
 
 namespace Iron::AssetCompiler {
+struct AssetType {
+    enum Type : u32 {
+        Unknown = 0,
+        Shader,
+        Texture,
+        Mesh,
+    };
+};
+
 struct ShaderType {
     enum Type : u32 {
         Unknown = 0,
