@@ -185,6 +185,9 @@ CORE_API void EnableLogLevel(LogLevel::Level Level, bool Enable);
 CORE_API void EnableLogIncludePath(bool Enable);
 CORE_API void LogError(Result::Code Code, const char* File, int Line);
 
+CORE_API Result::Code WriteFile(const char* file, const u8* const data, u64 length);
+CORE_API Result::Code ReadFile(const char* file, u8*& data, u64& length);
+
 template<typename T>
 static T&& Move(T& Obj) {
     return static_cast<T&&>(Obj);
