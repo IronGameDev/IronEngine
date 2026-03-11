@@ -56,7 +56,7 @@ private:
     Version                         m_ShaderVersion;
     std::string                     m_AppendStr;
 
-    constexpr static const char*    s_Prefixes[ShaderType::Count]{
+    constexpr static const char*    s_Prefixes[RHI::ShaderType::Count]{
         "err",
         "vs_",
         "ps_",
@@ -84,7 +84,7 @@ private:
     IDxcUtils*                      m_Utils;
     IDxcIncludeHandler*             m_Include;
 
-    constexpr static const char*    s_Prefixes[ShaderType::Count]{
+    constexpr static const char*    s_Prefixes[RHI::ShaderType::Count]{
         "err",
         "vs_",
         "ps_",

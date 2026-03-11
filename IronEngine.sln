@@ -41,6 +41,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Iron.AssetCompiler", "Iron.
 		{619A82AA-2F9A-4FAD-BF28-0ADA3D43EE48} = {619A82AA-2F9A-4FAD-BF28-0ADA3D43EE48}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EngineAssets", "EngineAssets\EngineAssets.vcxitems", "{71C762CD-FEBF-4CF8-B8CB-27599A6EC357}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64

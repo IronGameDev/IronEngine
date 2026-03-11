@@ -15,6 +15,7 @@ struct EngineAPI {
         Windowing = 0,
         Renderer,
         Input,
+        AssetCompiler,
         Audio,
         Filesystem,
         Count
@@ -33,31 +34,6 @@ struct EngineInitInfo {
         u32             Height{ 768 };
         bool            Fullscreen{ false };
     } Window;
-};
-
-struct EngineModule {
-    u64             Id;
-    void*           Library;
-    IObjectBase*    Factory;
-
-    constexpr static inline u64 Hash(const char* Name) noexcept {
-        u64 Hash{ 0x468a3276cf9809ed };
-
-        while (*Name != '\0') {
-            Hash ^= (u64)*Name + 0x83987239870acefd;
-            ++Name;
-        }
-
-        return Hash;
-    }
-
-    constexpr static inline bool IsValid(const EngineModule& M) {
-        return M.Library && M.Factory;
-    }
-
-    constexpr static inline bool IsLoaded(const EngineModule& M) {
-        return M.Library;
-    }
 };
 
 class Application {
@@ -85,6 +61,9 @@ ENGINE_API void RequestQuit();
 /// Get an engine module
 /// NEVER call destroy on these factories, this will cause UB
 ENGINE_API void* const GetEngineAPI(EngineAPI::Api Api);
+
+ENGINE_API IObjectBase* LoadPlugin(const char* dllPath);
+ENGINE_API void UnloadPlugin(const char* dllPath);
 
 ////User Plugins???
 //ENGINE_API Result::Code LoadModule(const char* Path, EngineModule* Handle);

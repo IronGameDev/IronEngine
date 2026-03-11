@@ -85,7 +85,7 @@ ConvertResourceStates(ResourceState::State state)
 }
 
 constexpr static D3D12_SHADER_VISIBILITY
-ConvertVisibility(ShaderType::Type vis) {
+ConvertVisibility(ShaderVisibility::Vis vis) {
     switch (vis)     {
     case ShaderType::Vertex:
         return D3D12_SHADER_VISIBILITY_VERTEX;

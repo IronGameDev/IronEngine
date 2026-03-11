@@ -1,5 +1,6 @@
 #pragma once
 #include <Iron.Core/Core.h>
+#include <Iron.RHI/RHIDefines.h>
 
 namespace Iron::AssetCompiler {
 struct AssetType {
@@ -8,18 +9,6 @@ struct AssetType {
         Shader,
         Texture,
         Mesh,
-    };
-};
-
-struct ShaderType {
-    enum Type : u32 {
-        Unknown = 0,
-        Vertex,
-        Pixel,
-        Compute,
-        Mesh,
-        Task,
-        Count,
     };
 };
 
@@ -38,7 +27,7 @@ struct ShaderDefine {
 };
 
 struct CompileShaderInfo {
-    ShaderType::Type        Type;
+    RHI::ShaderType::Type   Type;
     const char*             Entry;
     u32                     Flags;
     ShaderDefine*           Defines;

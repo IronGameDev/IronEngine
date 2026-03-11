@@ -45,6 +45,35 @@ GetEngineAPI(EngineAPI::Api Api) {
     return g_Context.GetEngineAPI(Api);
 }
 
+IObjectBase*
+LoadPlugin(const char* dllPath) {
+    if (!dllPath) {
+        LOG_RESULT(Result::ENullptr);
+        return nullptr;
+    }
+
+    const u64 id{ Fnv1A(dllPath) };
+
+    Result::Code res{ g_Context.m_Modules.LoadModule(dllPath, id) };
+    if (Result::Fail(res)) {
+        LOG_RESULT(res);
+        return nullptr;
+    }
+
+    return g_Context.m_Modules.GetFactory(id);
+}
+
+void
+UnloadPlugin(const char* dllPath) {
+    if (!dllPath) {
+        LOG_RESULT(Result::ENullptr);
+        return;
+    }
+
+    const u64 id{ Fnv1A(dllPath) };
+    g_Context.m_Modules.UnloadModule(id);
+}
+
 Version
 GetAppVersion() {
     return g_AppVersion;

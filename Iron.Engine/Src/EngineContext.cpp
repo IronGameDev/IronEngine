@@ -8,6 +8,7 @@ constexpr static const char* g_ModuleNames[EngineAPI::Count]{
     "Iron.Windowing.dll",
     "Iron.RHI.dll",
     "Iron.Input.dll",
+    "Iron.AssetCompiler.dll",
     "Iron.Audio.dll",
     "Iron.Filesystem.dll"
 };

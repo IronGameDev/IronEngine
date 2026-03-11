@@ -61,7 +61,7 @@ SetupRenderer(RHIGraphBuilder& builder) {
     builder.BeginPass("PostProcess", RenderStuff);
     builder.Read(depth, RHIFormat::R32_FLOAT, ResourceState::PixelResource, 0);
     builder.Read(color, RHIFormat::R8G8B8A8_UNORM, ResourceState::PixelResource, 1);
-    builder.WriteClear(bb, RHIFormat::R8G8B8A8_UNORM_SRGB, ResourceState::RenderTarget, 0, { 1.f, 0.f, 0.f, 1.f });
+    builder.WriteClear(bb, RHIFormat::R8G8B8A8_UNORM_SRGB, ResourceState::RenderTarget, 0, { 0.f, 0.7f, 0.f, 1.f });
     builder.EndPass();
 }
 }//anonymous namespace

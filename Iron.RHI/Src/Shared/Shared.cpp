@@ -11,7 +11,7 @@
 
 namespace Iron::RHI {
 namespace {
-using PFN_CREATE_DXGI_FACTORY_2 = HRESULT(*)(UINT, const IID&, void**);
+using PFN_CREATE_DXGI_FACTORY_2 = decltype(&CreateDXGIFactory2);
 
 #pragma warning(push)
 #pragma warning(disable : 4996)//TODO: Properly handle wchar conversion

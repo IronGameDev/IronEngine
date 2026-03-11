@@ -45,7 +45,7 @@ CShaderCompilerD3D::CompileShaderFromFile(
     }
 
     if (info.NumDefines && !info.Defines
-        || info.Type >= ShaderType::Count) {
+        || info.Type >= RHI::ShaderType::Count) {
         return Result::EInvalidarg;
     }
 
@@ -145,7 +145,7 @@ CShaderCompilerDXC::CompileShaderFromFile(
     }
 
     if (info.NumDefines && !info.Defines
-        || info.Type >= ShaderType::Count) {
+        || info.Type >= RHI::ShaderType::Count) {
         return Result::EInvalidarg;
     }
 
@@ -209,9 +209,9 @@ CShaderCompilerDXC::CompileShaderFromFile(
         extra_args.EmplaceBack(ToWideString(info.Defines[i].Definition));
     }
 
-    Vector<LPCWSTR> args{ extra_args.Size() };
+    Vector<LPCWSTR> args{};
     for (auto& arg : extra_args) {
-        args.EmplaceBack(arg.c_str());
+        args.PushBack(arg.c_str());
     }
 
     ComPtr<IDxcResult> results{ nullptr };

@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="D3D12">
+      <UniqueIdentifier>{2e6fb6d8-c1d9-48a4-850d-8d74ccadd319}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="$(MSBuildThisFileDirectory)D3D12\FullscreenVS.hlsl">
+      <Filter>D3D12</Filter>
+    </FxCompile>
+    <FxCompile Include="$(MSBuildThisFileDirectory)D3D12\ColorPS.hlsl" />
+  </ItemGroup>
+</Project>

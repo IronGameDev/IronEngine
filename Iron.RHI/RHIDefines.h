@@ -254,9 +254,20 @@ struct ResourceViewType {
 
 struct ShaderType {
     enum Type : u32 {
+        Unknown = 0,
+        Vertex,
+        Pixel,
+        Compute,
+        Mesh,
+        Task,
+        Count
+    };
+};
+
+struct ShaderVisibility {
+    enum Vis : u32 {
         All = 0,
         Compute,
-        Graphics,
         Vertex,
         Pixel,
     };
@@ -357,7 +368,7 @@ struct ClearValue {
 
 struct PipelineLayoutParam {
     PipelineLayoutParamType::Type   Type{};
-    ShaderType::Type                Visibility{ ShaderType::All };
+    ShaderVisibility::Vis           Visibility{ ShaderVisibility::All };
     u32                             Slot{};
     u32                             Space{ 0 };
     u32                             Count{ 1 };

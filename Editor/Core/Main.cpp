@@ -1,4 +1,5 @@
 #include <Iron.Core/Core.h>
+#include <Iron.AssetCompiler/AssetCompiler.h>
 #include <Iron.Engine/Engine.h>
 #include <Iron.Windowing/Windowing.h>
 #include <Iron.RHI/RHI.h>
@@ -15,9 +16,41 @@ public:
     ~Editor() override = default;
 
     Result::Code PreInitialize() override {
-        RHICommandBuilder cmd{ 1024 * 64 };
-        cmd.Draw(12, 54);
-        cmd.DrawIndexedInstanced(1322, 354, 453, 51, 21);
+        using namespace Iron::AssetCompiler;
+#if _DEBUG
+        ICompilerFactory* const assets{ (ICompilerFactory* const)LoadPlugin("D:\\code\\IronEngine\\x64\\Debug\\Iron.AssetCompiler.dll") };
+#else
+        ICompilerFactory* const assets{ (ICompilerFactory* const)LoadPlugin("D:\\code\\IronEngine\\x64\\Release\\Iron.AssetCompiler.dll") };
+#endif
+        if (!assets)
+            return Result::ELoadlibrary;
+
+        IShaderCompiler* compiler{};
+        assets->CreateShaderCompiler({ 6, 6, 0 }, &compiler);
+        if (!compiler)
+            return Result::ECreateResource;
+
+        CompileShaderInfo info{};
+        info.Type = RHI::ShaderType::Vertex;
+        info.Entry = "FullScreenVS";
+        info.Flags = 0;
+        info.Defines = nullptr;
+        info.NumDefines = 0;
+
+        IShader* shader{};
+        compiler->CompileShaderFromFile("D:\\code\\IronEngine\\EngineAssets\\D3D12\\FullscreenVS.hlsl",
+            info, &shader);
+        if (shader) shader->SaveToFile("D:\\code\\IronEngine\\EngineAssets\\D3D12\\Bin\\FullscreenVS.bin");
+        SafeRelease(shader);
+
+        info.Type = RHI::ShaderType::Pixel;
+        info.Entry = "ColorPS";
+        compiler->CompileShaderFromFile("D:\\code\\IronEngine\\EngineAssets\\D3D12\\ColorPS.hlsl",
+            info, &shader);
+        if (shader) shader->SaveToFile("D:\\code\\IronEngine\\EngineAssets\\D3D12\\Bin\\ColorPS.bin");
+        SafeRelease(shader);
+
+        UnloadPlugin("Iron.AssetCompiler.dll");
 
         return Result::Code::Ok;
     }
