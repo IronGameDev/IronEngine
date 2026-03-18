@@ -49,6 +49,172 @@ ConvertResourceMiscFlags(ResourceFlags::Flags flags) {
     return value;
 }
 
+constexpr D3D11_BLEND
+ConvertBlend(Blend::Type blend) {
+    switch (blend) {
+    case Blend::Zero:
+        return D3D11_BLEND_ZERO;
+    case Blend::One:
+        return D3D11_BLEND_ONE;
+    case Blend::SrcColor:
+        return D3D11_BLEND_SRC_COLOR;
+    case Blend::InvSrcColor:
+        return D3D11_BLEND_INV_SRC_COLOR;
+    case Blend::SrcAlpha:
+        return D3D11_BLEND_SRC_ALPHA;
+    case Blend::InvSrcAlpha:
+        return D3D11_BLEND_INV_SRC_ALPHA;
+    case Blend::DstColor:
+        return D3D11_BLEND_DEST_COLOR;
+    case Blend::InvDstColor:
+        return D3D11_BLEND_INV_DEST_COLOR;
+    case Blend::DstAlpha:
+        return D3D11_BLEND_DEST_ALPHA;
+    case Blend::InvDstAlpha:
+        return D3D11_BLEND_INV_DEST_ALPHA;
+    case Blend::BlendFactor:
+        return D3D11_BLEND_BLEND_FACTOR;
+    default:
+        return D3D11_BLEND_ZERO;
+    }
+}
+
+constexpr D3D11_BLEND_OP
+ConvertBlendOp(BlendOp::Op op) {
+    switch (op) {
+    case BlendOp::Add:
+        return D3D11_BLEND_OP_ADD;
+    case BlendOp::Sub:
+        return D3D11_BLEND_OP_SUBTRACT;
+    case BlendOp::RevSub:
+        return D3D11_BLEND_OP_REV_SUBTRACT;
+    case BlendOp::Min:
+        return D3D11_BLEND_OP_MIN;
+    case BlendOp::Max:
+        return D3D11_BLEND_OP_MAX;
+    default:
+        return D3D11_BLEND_OP_ADD;
+    }
+}
+
+constexpr D3D11_LOGIC_OP
+ConvertLogicOp(LogicOp::Op op) {
+    switch (op) {
+    case LogicOp::Clear:
+        return D3D11_LOGIC_OP_CLEAR;
+    case LogicOp::Set:
+        return D3D11_LOGIC_OP_SET;
+    case LogicOp::Copy:
+        return D3D11_LOGIC_OP_COPY;
+    case LogicOp::CopyInv:
+        return D3D11_LOGIC_OP_COPY_INVERTED;
+    case LogicOp::Noop:
+        return D3D11_LOGIC_OP_NOOP;
+    case LogicOp::Inv:
+        return D3D11_LOGIC_OP_INVERT;
+    case LogicOp::And:
+        return D3D11_LOGIC_OP_AND;
+    case LogicOp::Nand:
+        return D3D11_LOGIC_OP_NAND;
+    case LogicOp::Or:
+        return D3D11_LOGIC_OP_OR;
+    case LogicOp::Nor:
+        return D3D11_LOGIC_OP_NOR;
+    case LogicOp::Xor:
+        return D3D11_LOGIC_OP_XOR;
+    case LogicOp::Equiv:
+        return D3D11_LOGIC_OP_EQUIV;
+    case LogicOp::AndRev:
+        return D3D11_LOGIC_OP_AND_REVERSE;
+    case LogicOp::AndInv:
+        return D3D11_LOGIC_OP_AND_INVERTED;
+    case LogicOp::OrRev:
+        return D3D11_LOGIC_OP_OR_REVERSE;
+    case LogicOp::OrInv:
+        return D3D11_LOGIC_OP_OR_INVERTED;
+    default:
+        return D3D11_LOGIC_OP_CLEAR;
+    }
+}
+
+constexpr D3D11_FILL_MODE
+ConvertFillMode(FillMode::Mode mode) {
+    switch (mode) {
+    case FillMode::Wireframe:
+        return D3D11_FILL_WIREFRAME;
+    case FillMode::Solid:
+        return D3D11_FILL_SOLID;
+    default:
+        return D3D11_FILL_SOLID;
+    }
+}
+
+constexpr D3D11_CULL_MODE
+ConvertCullMode(CullMode::Mode mode) {
+    switch (mode)
+    {
+    case CullMode::None:
+        return D3D11_CULL_NONE;
+    case CullMode::Front:
+        return D3D11_CULL_FRONT;
+    case CullMode::Back:
+        return D3D11_CULL_BACK;
+    default:
+        return D3D11_CULL_FRONT;
+    }
+}
+
+constexpr D3D11_COMPARISON_FUNC
+ConvertComparisonFunc(ComparisonFunc::Func func) {
+    switch (func) {
+    case ComparisonFunc::None:
+        return D3D11_COMPARISON_NEVER;
+    case ComparisonFunc::Never:
+        return D3D11_COMPARISON_NEVER;
+    case ComparisonFunc::Less:
+        return D3D11_COMPARISON_LESS;
+    case ComparisonFunc::Equal:
+        return D3D11_COMPARISON_EQUAL;
+    case ComparisonFunc::LessEqual:
+        return D3D11_COMPARISON_LESS_EQUAL;
+    case ComparisonFunc::Greater:
+        return D3D11_COMPARISON_GREATER;
+    case ComparisonFunc::NotEqual:
+        return D3D11_COMPARISON_NOT_EQUAL;
+    case ComparisonFunc::GreaterEqual:
+        return D3D11_COMPARISON_GREATER_EQUAL;
+    case ComparisonFunc::Always:
+        return D3D11_COMPARISON_ALWAYS;
+    default:
+        return D3D11_COMPARISON_NEVER;
+    }
+}
+
+constexpr D3D11_STENCIL_OP
+ConvertStencilOp(StencilOp::Op op) {
+    switch (op) {
+    case StencilOp::Keep:
+        return D3D11_STENCIL_OP_KEEP;
+    case StencilOp::Zero:
+        return D3D11_STENCIL_OP_ZERO;
+    case StencilOp::Replace:
+        return D3D11_STENCIL_OP_REPLACE;
+    case StencilOp::IncrSat:
+        return D3D11_STENCIL_OP_INCR_SAT;
+    case StencilOp::DecrSat:
+        return D3D11_STENCIL_OP_DECR_SAT;
+    case StencilOp::Inv:
+        return D3D11_STENCIL_OP_INVERT;
+    case StencilOp::Incr:
+        return D3D11_STENCIL_OP_INCR;
+    case StencilOp::Decr:
+        return D3D11_STENCIL_OP_DECR;
+    default:
+        return D3D11_STENCIL_OP_KEEP;
+    }
+}
+
+
 inline void SetDebugName(ID3D11DeviceChild* object, const char* name) {
 #if defined(_DEBUG)
     if (object) {
@@ -59,6 +225,215 @@ inline void SetDebugName(ID3D11DeviceChild* object, const char* name) {
         );
     }
 #endif
+}
+
+namespace Cmd {
+struct CommandListData {
+    ID3D11DeviceContext4*           Ctx{};
+    CRHIDevice_DX11*                Device{};
+
+    bool                            GraphicsLayout{};
+    RHIPipelineLayout               CurrentLayout{ Id::InvalidId };
+
+    ID3D11ComputeShader*            CurrentCS{};
+    ID3D11VertexShader*             CurrentVS{};
+    ID3D11PixelShader*              CurrentPS{};
+    ID3D11DomainShader*             CurrentDS{};
+    ID3D11HullShader*               CurrentHS{};
+    ID3D11GeometryShader*           CurrentGS{};
+    ID3D11BlendState1*              CurrentBlend{};
+    ID3D11RasterizerState2*         CurrentRaster{};
+    ID3D11DepthStencilState*        CurrentDepth{};
+
+    u32                             CounterDraw{};
+    u32                             CounterDrawInstanced{};
+    u32                             CounterDrawIndexed{};
+    u32                             CounterDrawIndexedInstanced{};
+};
+
+typedef void(*CommandFunc)(CommandListData&, const void*);
+
+void
+CopyResource(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdCopyResourceInfo& info{ *(const RHICommandBuilder::CmdCopyResourceInfo*)data };
+    ID3D11Resource* const src{ cmdData.Device->ResolveResource(info.Src) };
+    ID3D11Resource* const dst{ cmdData.Device->ResolveResource(info.Dst) };
+    cmdData.Ctx->CopyResource(dst, src);
+}
+
+void
+SetGraphicsLayout(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdSetGraphicsLayoutInfo& info{ *(const RHICommandBuilder::CmdSetGraphicsLayoutInfo*)data };
+    if (cmdData.CurrentLayout != info.Layout) {
+        //ID3D12RootSignature* root_sig{ cmdData.Device->ResolveLayout(info.Layout) };
+        //cmdData.Ctx->SetGraphicsRootSignature(root_sig);
+        cmdData.GraphicsLayout = true;
+        cmdData.CurrentLayout = info.Layout;
+    }
+}
+
+void
+SetComputeLayout(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdSetGraphicsLayoutInfo& info{ *(const RHICommandBuilder::CmdSetGraphicsLayoutInfo*)data };
+    if (cmdData.CurrentLayout != info.Layout) {
+        //ID3D12RootSignature* root_sig{ cmdData.Device->ResolveLayout(info.Layout) };
+        //cmdData.Ctx->SetComputeRootSignature(root_sig);
+        cmdData.GraphicsLayout = false;
+        cmdData.CurrentLayout = info.Layout;
+    }
+}
+
+void
+SetPipeline(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdSetPipelineInfo& info{ *(const RHICommandBuilder::CmdSetPipelineInfo*)data };
+    const CRHIDevice_DX11::PipelineData& pso_data{ cmdData.Device->ResolvePipelineData(info.Pso) };
+
+    if (pso_data.Graphics) {
+        const CRHIDevice_DX11::GraphicsPipeline& pso{ cmdData.Device->ResolveGraphicsPipeline(pso_data) };
+
+        if (pso.VS.Ptr != cmdData.CurrentVS) {
+            cmdData.Ctx->VSSetShader(pso.VS.Ptr, nullptr, 0);
+            cmdData.CurrentVS = pso.VS.Ptr;
+        }
+        if (pso.PS.Ptr != cmdData.CurrentPS) {
+            cmdData.Ctx->PSSetShader(pso.PS.Ptr, nullptr, 0);
+            cmdData.CurrentPS = pso.PS.Ptr;
+        }
+        if (pso.DS.Ptr != cmdData.CurrentDS) {
+            cmdData.Ctx->DSSetShader(pso.DS.Ptr, nullptr, 0);
+            cmdData.CurrentDS = pso.DS.Ptr;
+        }
+        if (pso.HS.Ptr != cmdData.CurrentHS) {
+            cmdData.Ctx->HSSetShader(pso.HS.Ptr, nullptr, 0);
+            cmdData.CurrentHS = pso.HS.Ptr;
+        }
+        if (pso.GS.Ptr != cmdData.CurrentGS) {
+            cmdData.Ctx->GSSetShader(pso.GS.Ptr, nullptr, 0);
+            cmdData.CurrentGS = pso.GS.Ptr;
+        }
+        if (pso.Blend.Ptr != cmdData.CurrentBlend) {
+            constexpr float b[4]{ 0.f, 0.f, 0.f, 0.f };///////TODODOOOOOOOOO
+            cmdData.Ctx->OMSetBlendState(pso.Blend.Ptr, &b[0], pso.SampleMask);
+            cmdData.CurrentBlend = pso.Blend.Ptr;
+        }
+        if (pso.Rasterizer.Ptr != cmdData.CurrentRaster) {
+            cmdData.Ctx->RSSetState(pso.Rasterizer.Ptr);
+            cmdData.CurrentRaster = pso.Rasterizer.Ptr;
+        }
+        if (pso.Depth.Ptr != cmdData.CurrentDepth) {
+            cmdData.Ctx->OMSetDepthStencilState(pso.Depth.Ptr, 0);
+            cmdData.CurrentDepth = pso.Depth.Ptr;
+        }
+    }
+    else {
+        const CRHIDevice_DX11::ComputePipeline& pso{ cmdData.Device->ResolveComputePipeline(pso_data) };
+
+        if (pso.CS.Ptr != cmdData.CurrentCS) {
+            cmdData.Ctx->CSSetShader(pso.CS.Ptr, nullptr, 0);
+            cmdData.CurrentCS = pso.CS.Ptr;
+        }
+    }
+}
+
+void
+SetPrimitiveTopology(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdSetPrimitiveTopologyInfo& info{ *(const RHICommandBuilder::CmdSetPrimitiveTopologyInfo*)data };
+    cmdData.Ctx->IASetPrimitiveTopology(Shared::ConvertTopology(info.Topology));
+}
+
+void
+SetViewport(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdSetViewportsInfo& info{ *(const RHICommandBuilder::CmdSetViewportsInfo*)data };
+    static D3D11_VIEWPORT vps[RHI_MAX_TARGET_COUNT]{};
+    for (u32 i{ 0 }; i < info.Count; ++i) {
+        vps[i].TopLeftX = info.Views[i].TopLeftX;
+        vps[i].TopLeftY = info.Views[i].TopLeftY;
+        vps[i].Width = info.Views[i].Width;
+        vps[i].Height = info.Views[i].Height;
+        vps[i].MinDepth = info.Views[i].MinDepth;
+        vps[i].MaxDepth = info.Views[i].MaxDepth;
+    }
+
+    cmdData.Ctx->RSSetViewports(info.Count, &vps[0]);
+}
+
+void
+SetScissor(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdSetScissorsInfo& info{ *(const RHICommandBuilder::CmdSetScissorsInfo*)data };
+    static D3D11_RECT rcs[RHI_MAX_TARGET_COUNT]{};
+    for (u32 i{ 0 }; i < info.Count; ++i) {
+        rcs[i].left = info.Rects[i].Left;
+        rcs[i].top = info.Rects[i].Top;
+        rcs[i].right = info.Rects[i].Right;
+        rcs[i].bottom = info.Rects[i].Bottom;
+    }
+
+    cmdData.Ctx->RSSetScissorRects(info.Count, &rcs[0]);
+}
+
+void
+Draw(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdDrawInfo& info{ *(const RHICommandBuilder::CmdDrawInfo*)data };
+    cmdData.Ctx->Draw(info.VertexCount, info.BaseVertex);
+    ++cmdData.CounterDraw;
+}
+
+void
+DrawInstanced(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdDrawInstancedInfo& info{ *(const RHICommandBuilder::CmdDrawInstancedInfo*)data };
+    cmdData.Ctx->DrawInstanced(info.VertexCount, info.InstanceCount, info.BaseVertex, info.BaseInstance);
+    ++cmdData.CounterDrawInstanced;
+}
+
+void
+DrawIndexed(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdDrawIndexedInfo& info{ *(const RHICommandBuilder::CmdDrawIndexedInfo*)data };
+    cmdData.Ctx->DrawIndexed(info.IndexCount, info.BaseIndex, info.BaseVertex);
+    ++cmdData.CounterDrawIndexed;
+}
+
+void
+DrawIndexedInstanced(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdDrawInstancedIndexedInfo& info{ *(const RHICommandBuilder::CmdDrawInstancedIndexedInfo*)data };
+    cmdData.Ctx->DrawIndexedInstanced(info.IndexCount, info.InstanceCount, info.BaseIndex, info.BaseVertex, info.BaseInstance);
+    ++cmdData.CounterDrawIndexedInstanced;
+}
+
+constexpr static CommandFunc DispatchTable[RHICommandBuilder::CommandId::Count]{
+    CopyResource,
+    SetGraphicsLayout,
+    SetComputeLayout,
+    SetPipeline,
+    SetPrimitiveTopology,
+    SetViewport,
+    SetScissor,
+    Draw,
+    DrawInstanced,
+    DrawIndexed,
+    DrawIndexedInstanced,
+};
+
+void
+ParseCommandStream(RHICommandBuilder& builder, CommandListData& cmdData) {
+    if (!(builder.GetStream() && cmdData.Ctx)) {
+        return;
+    }
+
+    const u32 total_size{ builder.GetOffset() };
+    const u8* stream{ builder.GetStream() };
+    const u8* const end{ stream + total_size };
+
+    while (stream < end) {
+        const RHICommandBuilder::CmdHeader header{ *(const RHICommandBuilder::CmdHeader*)stream };
+        if (header.Id >= RHICommandBuilder::CommandId::Count) {
+            LOG_ERROR("Invalid command id used!");
+        }
+
+        stream += sizeof(RHICommandBuilder::CmdHeader);
+        DispatchTable[header.Id](cmdData, stream);
+        stream += header.PayloadSize;
+    }
+}
 }
 }//anonymous namespace
 
@@ -193,18 +568,439 @@ CRHIDevice_DX11::Release() {
 
 Result::Code
 CRHIDevice_DX11::CreateResource(const ResourceInitInfo& info,
-    IRHIResource** resource) {
-    CRHIResource_DX11* temp{ new CRHIResource_DX11(m_Device, info) };
-    if (!temp) {
-        return Result::ENomemory;
+    RHIResource* resource) {
+    u32 cpu_flags{ 0 };
+    if (info.CPURead) cpu_flags |= D3D11_CPU_ACCESS_READ;
+    if (info.CPUWrite) cpu_flags |= D3D11_CPU_ACCESS_WRITE;
+
+    const DXGI_FORMAT format{ Shared::ConvertFormat(info.Format) };
+    const D3D11_USAGE usage{ ConvertUsage(info.Usage) };
+    const u32 bind_flags{ ConvertResourceBindFlags((ResourceFlags::Flags)info.Flags) };
+    const u32 misc_flags{ ConvertResourceMiscFlags((ResourceFlags::Flags)info.Flags) };
+
+    DenseResource dense{};
+
+    switch (info.Dimension)
+    {
+    case ResourceDimension::Buffer: {
+        D3D11_BUFFER_DESC desc{};
+        desc.ByteWidth = info.Width;
+        desc.Usage = usage;
+        desc.BindFlags = bind_flags;
+        desc.CPUAccessFlags = cpu_flags;
+        desc.MiscFlags = misc_flags;
+        desc.StructureByteStride = info.StructuredStride;
+
+        dense.Type = DenseResource::EBuffer;
+
+        HRESULT hr{ S_OK };
+        hr = m_Device->CreateBuffer(&desc, nullptr, (ID3D11Buffer**)&dense.Resource);
+        if (FAILED(hr)) {
+            return Result::ECreateResource;
+        }
+    } break;
+    case ResourceDimension::Texture1D: {
+        D3D11_TEXTURE1D_DESC desc{};
+        desc.Width = info.Width;
+        desc.MipLevels = info.MipLevels;
+        desc.ArraySize = info.DepthOrArray;
+        desc.Format = format;
+        desc.Usage = usage;
+        desc.BindFlags = bind_flags;
+        desc.CPUAccessFlags = cpu_flags;
+        desc.MiscFlags = misc_flags;
+
+        dense.Type = DenseResource::ETexture1D;
+
+        HRESULT hr{ S_OK };
+        hr = m_Device->CreateTexture1D(&desc, nullptr, (ID3D11Texture1D**)&dense.Resource);
+        if (FAILED(hr)) {
+            return Result::ECreateResource;
+        }
+    } break;
+    case ResourceDimension::Texture2D: {
+        D3D11_TEXTURE2D_DESC desc{};
+        desc.Width = info.Width;
+        desc.Height = info.Height;
+        desc.MipLevels = info.MipLevels;
+        desc.ArraySize = info.DepthOrArray;
+        desc.Format = format;
+        desc.SampleDesc = { 1, 0 };
+        desc.Usage = usage;
+        desc.BindFlags = bind_flags;
+        desc.CPUAccessFlags = cpu_flags;
+        desc.MiscFlags = misc_flags;
+
+        dense.Type = DenseResource::ETexture2D;
+
+        HRESULT hr{ S_OK };
+        hr = m_Device->CreateTexture2D(&desc, nullptr, (ID3D11Texture2D**)&dense.Resource);
+        if (FAILED(hr)) {
+            return Result::ECreateResource;
+        }
+    } break;
+    case ResourceDimension::Texture3D: {
+        D3D11_TEXTURE3D_DESC desc{};
+        desc.Width = info.Width;
+        desc.Height = info.Height;
+        desc.Depth = info.DepthOrArray;
+        desc.MipLevels = info.MipLevels;
+        desc.Format = format;
+        desc.Usage = usage;
+        desc.BindFlags = bind_flags;
+        desc.CPUAccessFlags = cpu_flags;
+        desc.MiscFlags = misc_flags;
+
+        dense.Type = DenseResource::ETexture3D;
+
+        HRESULT hr{ S_OK };
+        hr = m_Device->CreateTexture3D(&desc, nullptr, (ID3D11Texture3D**)&dense.Resource);
+        if (FAILED(hr)) {
+            return Result::ECreateResource;
+        }
+    } break;
+    default:
+        LOG_WARNING("Invalid resource dimension!");
+        break;
     }
 
-    if (!temp->GetNative()) {
-        delete temp;
+    if (!dense.Resource) {
         return Result::ECreateResource;
     }
 
-    *resource = temp;
+    u32 sparse_index{};
+    if (!m_FreeSparseResources.Empty()) {
+        sparse_index = m_FreeSparseResources.Back();
+        m_FreeSparseResources.PopBack();
+    }
+    else {
+        sparse_index = m_SparseResources.Size();
+        m_SparseResources.PushBack({});
+    }
+
+    dense.SparseIndex = sparse_index;
+
+    const u32 dense_index{ m_DenseResources.Size() };
+    m_DenseResources.EmplaceBack(dense);
+
+    auto& slot{ m_SparseResources[sparse_index] };
+    slot.DenseIndex = dense_index;
+
+    *resource = Id::MakeHandle(sparse_index, slot.Generation);
+
+    return Result::Ok;
+}
+
+Result::Code
+CRHIDevice_DX11::CreatePipelineLayout(const PipelineLayoutInitInfo& info,
+    RHIPipelineLayout* outHandle) {
+    if (!outHandle) {
+        return Result::ENullptr;
+    }
+
+    *outHandle = Id::InvalidId;
+
+    if (info.PushConstantSize) {
+        LOG_ERROR("D3D11 Push constants not supported yet!");
+        return Result::EInvalidarg;
+    }
+
+    u32 index{};
+    if (m_FreeLayouts.Size()) {
+        for (u32 i{ 0 }; i < m_FreeLayouts.Size(); ++i) {
+            const u32 free{ m_FreeLayouts[i] };
+            if (m_PipelineLayouts[free].Count == info.NumParams) {
+                index = free;
+                m_FreeLayouts.Erase(i);
+                break;
+            }
+        }
+    }
+    else {
+        index = m_PipelineLayouts.Size();
+        m_PipelineLayouts.EmplaceBack();
+    }
+
+    PipelineLayout& layout{ m_PipelineLayouts[index] };
+    layout.Count = info.NumParams;
+
+    if (!layout.Start) {
+        layout.Start = m_PipelineParams.Size();
+        for (u32 i{ 0 }; i < info.NumParams; ++i)
+            m_PipelineParams.EmplaceBack();
+
+    }
+
+    for (u32 i{ 0 }; i < layout.Count; ++i) {
+        m_PipelineParams[layout.Start + i] = info.Params[i];
+    }
+
+    *outHandle = Id::MakeHandle(index, layout.Generation);
+
+    return Result::Ok;
+}
+
+Result::Code
+CRHIDevice_DX11::CreateComputePipeline(const ComputePipelineInitInfo& info,
+    RHIPipeline* outHandle) {
+    const u64 cs_hash{ Shared::HashShaderBytecode(info.CS, 1469598103934665603ull) };
+
+    ComputePipeline pipeline{};
+    pipeline.Layout = info.Layout;
+    pipeline.CS = m_ComputeShaders.Retrieve(cs_hash);
+
+    if (!pipeline.CS.IsValid()) {
+        ID3D11ComputeShader* shader{ nullptr };
+        HRESULT hr{ S_OK };
+        hr = m_Device->CreateComputeShader(
+            info.CS.Blob,
+            info.CS.Size,
+            nullptr,
+            &shader);
+        if (FAILED(hr)) {
+            LOG_HR(hr);
+            return Result::ECreateRHIObject;
+        }
+
+        pipeline.CS = m_ComputeShaders.AddNewItem(cs_hash, shader);
+    }
+
+    if (!pipeline.CS.IsValid()) {
+        return Result::ECreateRHIObject;
+    }
+
+    u32 index{};
+    if (m_FreePipelines.Size()) {
+        index = m_FreePipelines.Back();
+        m_FreePipelines.PopBack();
+    }
+    else {
+        index = m_Pipelines.Size();
+        m_Pipelines.EmplaceBack();
+    }
+
+    m_Pipelines[index].Graphics = false;
+    m_Pipelines[index].Index = m_ComputePipelines.Size();
+    m_ComputePipelines.EmplaceBack(pipeline);
+
+    *outHandle = Id::MakeHandle(index, m_Pipelines[index].Generation);
+
+    return Result::Ok;
+}
+
+Result::Code
+CRHIDevice_DX11::CreateGraphicsPipeline(const GraphicsPipelineInitInfo& info,
+    RHIPipeline* outHandle) {
+    if (!outHandle) {
+        return Result::ENullptr;
+    }
+
+    const u64 vs_hash{ Shared::HashShaderBytecode(info.VS, 1469598103934665603ull) };
+    const u64 ps_hash{ Shared::HashShaderBytecode(info.PS, 1469598103934665603ull) };
+    const u64 ds_hash{ Shared::HashShaderBytecode(info.DS, 1469598103934665603ull) };
+    const u64 hs_hash{ Shared::HashShaderBytecode(info.HS, 1469598103934665603ull) };
+    const u64 gs_hash{ Shared::HashShaderBytecode(info.GS, 1469598103934665603ull) };
+
+    GraphicsPipeline pipeline{};
+    pipeline.Layout = info.Layout;
+    pipeline.VS = m_VertexShaders.Retrieve(vs_hash);
+    pipeline.PS = m_PixelShaders.Retrieve(ps_hash);
+    pipeline.DS = m_DomainShaders.Retrieve(ds_hash);
+    pipeline.HS = m_HullShaders.Retrieve(hs_hash);
+    pipeline.GS = m_GeometryShaders.Retrieve(gs_hash);
+
+    if (!pipeline.VS.IsValid() && info.VS.Blob) {
+        ID3D11VertexShader* shader{ nullptr };
+        HRESULT hr{ S_OK };
+        hr = m_Device->CreateVertexShader(
+            info.VS.Blob,
+            info.VS.Size,
+            nullptr,
+            &shader);
+        if (FAILED(hr)) {
+            LOG_HR(hr);
+            return Result::ECreateRHIObject;
+        }
+
+        pipeline.VS = m_VertexShaders.AddNewItem(vs_hash, shader);
+    }
+    if (!pipeline.PS.IsValid() && info.PS.Blob) {
+        ID3D11PixelShader* shader{ nullptr };
+        HRESULT hr{ S_OK };
+        hr = m_Device->CreatePixelShader(
+            info.PS.Blob,
+            info.PS.Size,
+            nullptr,
+            &shader);
+        if (FAILED(hr)) {
+            LOG_HR(hr);
+            return Result::ECreateRHIObject;
+        }
+
+        pipeline.PS = m_PixelShaders.AddNewItem(ps_hash, shader);
+    }
+    if (!pipeline.DS.IsValid() && info.DS.Blob) {
+        ID3D11DomainShader* shader{ nullptr };
+        HRESULT hr{ S_OK };
+        hr = m_Device->CreateDomainShader(
+            info.DS.Blob,
+            info.DS.Size,
+            nullptr,
+            &shader);
+        if (FAILED(hr)) {
+            LOG_HR(hr);
+            return Result::ECreateRHIObject;
+        }
+
+        pipeline.DS = m_DomainShaders.AddNewItem(ds_hash, shader);
+    }
+    if (!pipeline.HS.IsValid() && info.HS.Blob) {
+        ID3D11HullShader* shader{ nullptr };
+        HRESULT hr{ S_OK };
+        hr = m_Device->CreateHullShader(
+            info.HS.Blob,
+            info.HS.Size,
+            nullptr,
+            &shader);
+        if (FAILED(hr)) {
+            LOG_HR(hr);
+            return Result::ECreateRHIObject;
+        }
+
+        pipeline.HS = m_HullShaders.AddNewItem(hs_hash, shader);
+    }
+    if (!pipeline.GS.IsValid() && info.GS.Blob) {
+        ID3D11GeometryShader* shader{ nullptr };
+        HRESULT hr{ S_OK };
+        hr = m_Device->CreateGeometryShader(
+            info.GS.Blob,
+            info.GS.Size,
+            nullptr,
+            &shader);
+        if (FAILED(hr)) {
+            LOG_HR(hr);
+            return Result::ECreateRHIObject;
+        }
+
+        pipeline.GS = m_GeometryShaders.AddNewItem(gs_hash, shader);
+    }
+
+    pipeline.SampleMask = info.SampleMask;
+
+    D3D11_BLEND_DESC1 blend{};
+    blend.AlphaToCoverageEnable = info.Blend.AlphaToCoverageEnable;
+    blend.IndependentBlendEnable = info.Blend.IndependentBlendEnable;
+
+    for (u32 i{ 0 }; i < RHI_MAX_TARGET_COUNT; ++i) {
+        const TargetBlendInitInfo& tgt{ info.Blend.Targets[i] };
+
+        blend.RenderTarget[i].BlendEnable = tgt.BlendEnable;
+        blend.RenderTarget[i].LogicOpEnable = tgt.LogicOp;
+        blend.RenderTarget[i].SrcBlend = ConvertBlend(tgt.SrcBlend);
+        blend.RenderTarget[i].DestBlend = ConvertBlend(tgt.DstBlend);
+        blend.RenderTarget[i].BlendOp = ConvertBlendOp(tgt.BlendOp);
+        blend.RenderTarget[i].SrcBlendAlpha = ConvertBlend(tgt.SrcBlendAlpha);
+        blend.RenderTarget[i].DestBlendAlpha = ConvertBlend(tgt.DstBlendAlpha);
+        blend.RenderTarget[i].BlendOpAlpha = ConvertBlendOp(tgt.BlendOpAlpha);
+        blend.RenderTarget[i].LogicOp = ConvertLogicOp(tgt.LogicOp);
+        blend.RenderTarget[i].RenderTargetWriteMask = tgt.TargetMask;
+    }
+
+    D3D11_RASTERIZER_DESC2 rasterizer{};
+    rasterizer.FillMode = ConvertFillMode(info.Rasterizer.Fill);
+    rasterizer.CullMode = ConvertCullMode(info.Rasterizer.Cull);
+    rasterizer.FrontCounterClockwise = info.Rasterizer.FrontCounterClockwise;
+    rasterizer.DepthBias = info.Rasterizer.DepthBias;
+    rasterizer.DepthBiasClamp = info.Rasterizer.DepthBiasClamp;
+    rasterizer.SlopeScaledDepthBias = info.Rasterizer.SlopeScaledDepthBias;
+    rasterizer.DepthClipEnable = info.Rasterizer.DepthClipEnable;
+    rasterizer.MultisampleEnable = info.Rasterizer.MultisampleEnable;
+    rasterizer.AntialiasedLineEnable = info.Rasterizer.AntialiasedLineEnable;
+    rasterizer.ForcedSampleCount = info.Rasterizer.ForcedSampleCount;
+    rasterizer.ConservativeRaster =
+        info.Rasterizer.ConservativeRaster
+        ? D3D11_CONSERVATIVE_RASTERIZATION_MODE_ON
+        : D3D11_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+
+    D3D11_DEPTH_STENCIL_DESC depth{};
+    depth.DepthEnable = info.DepthStencil.DepthEnable;
+    depth.DepthWriteMask = info.DepthStencil.DepthWriteAll ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO;
+    depth.DepthFunc = ConvertComparisonFunc(info.DepthStencil.DepthFunc);
+    depth.StencilEnable = info.DepthStencil.StencilEnable;
+    depth.StencilReadMask = info.DepthStencil.StencilReadMask;
+    depth.StencilWriteMask = info.DepthStencil.StencilWriteMask;
+    depth.FrontFace.StencilFailOp = ConvertStencilOp(info.DepthStencil.FrontFace.StencilFailOp);
+    depth.FrontFace.StencilDepthFailOp = ConvertStencilOp(info.DepthStencil.FrontFace.StencilDepthFailOp);
+    depth.FrontFace.StencilPassOp = ConvertStencilOp(info.DepthStencil.FrontFace.StencilPassOp);
+    depth.FrontFace.StencilFunc = ConvertComparisonFunc(info.DepthStencil.FrontFace.StencilFunc);
+    depth.BackFace.StencilFailOp = ConvertStencilOp(info.DepthStencil.BackFace.StencilFailOp);
+    depth.BackFace.StencilDepthFailOp = ConvertStencilOp(info.DepthStencil.BackFace.StencilDepthFailOp);
+    depth.BackFace.StencilPassOp = ConvertStencilOp(info.DepthStencil.BackFace.StencilPassOp);
+    depth.BackFace.StencilFunc = ConvertComparisonFunc(info.DepthStencil.BackFace.StencilFunc);
+
+    const u64 blend_hash{ Shared::HashStruct(blend, 1469598103934665603ull) };
+    const u64 raster_hash{ Shared::HashStruct(rasterizer, 1469598103934665603ull) };
+    const u64 depth_hash{ Shared::HashStruct(depth, 1469598103934665603ull) };
+
+    pipeline.Blend = m_BlendStates.Retrieve(blend_hash);
+    pipeline.Rasterizer = m_RasterStates.Retrieve(raster_hash);
+    pipeline.Depth = m_DepthStates.Retrieve(depth_hash);
+
+    if (!pipeline.Blend.IsValid()) {
+        ID3D11BlendState1* state{ nullptr };
+        HRESULT hr{ S_OK };
+        hr = m_Device->CreateBlendState1(&blend,
+            &state);
+
+        if (FAILED(hr)) {
+            LOG_HR(hr);
+            return Result::ECreateRHIObject;
+        }
+
+        pipeline.Blend = m_BlendStates.AddNewItem(blend_hash, state);
+    }
+    if (!pipeline.Rasterizer.IsValid()) {
+        ID3D11RasterizerState2* state{ nullptr };
+        HRESULT hr{ S_OK };
+        hr = m_Device->CreateRasterizerState2(&rasterizer,
+            &state);
+
+        if (FAILED(hr)) {
+            LOG_HR(hr);
+            return Result::ECreateRHIObject;
+        }
+
+        pipeline.Rasterizer = m_RasterStates.AddNewItem(raster_hash, state);
+    }
+    if (!pipeline.Depth.IsValid()) {
+        ID3D11DepthStencilState* state{ nullptr };
+        HRESULT hr{ S_OK };
+        hr = m_Device->CreateDepthStencilState(&depth,
+            &state);
+
+        if (FAILED(hr)) {
+            LOG_HR(hr);
+            return Result::ECreateRHIObject;
+        }
+
+        pipeline.Depth = m_DepthStates.AddNewItem(depth_hash, state);
+    }
+
+    u32 index{};
+    if (m_FreePipelines.Size()) {
+        index = m_FreePipelines.Back();
+        m_FreePipelines.PopBack();
+    }
+    else {
+        index = m_Pipelines.Size();
+        m_Pipelines.EmplaceBack();
+    }
+
+    m_Pipelines[index].Graphics = true;
+    m_Pipelines[index].Index = m_GraphicsPipelines.Size();
+    m_GraphicsPipelines.EmplaceBack(pipeline);
+
+    *outHandle = Id::MakeHandle(index, m_Pipelines[index].Generation);
 
     return Result::Ok;
 }
@@ -231,8 +1027,7 @@ CRHIDevice_DX11::CreateSurface(const SurfaceInitInfo& info,
 Result::Code
 CRHIDevice_DX11::CreateFrameGraph(const RHIGraphBuilder& builder,
     u32 flags,
-    IRHIFrameGraph** outHandle)
-{
+    IRHIFrameGraph** outHandle) {
     CRHIFrameGraph_DX11* temp{ new CRHIFrameGraph_DX11() };
     if (!temp) {
         return Result::ENomemory;
@@ -252,6 +1047,96 @@ CRHIDevice_DX11::CreateFrameGraph(const RHIGraphBuilder& builder,
 }
 
 void
+CRHIDevice_DX11::DestroyResource(RHIResource resource) {
+    if (!Id::IsValid(resource)) {
+        return;
+    }
+
+    u32 sparse_index{ Id::Index(resource) };
+    auto& slot{ m_SparseResources[sparse_index] };
+
+    if (slot.Generation != Id::Generation(resource)) {
+        return;
+    }
+
+    const u32 dense_index{ slot.DenseIndex };
+    const u32 last_dense{ m_DenseResources.Size() - 1 };
+    const u32 moved_sparse{ m_DenseResources[last_dense].SparseIndex };
+    DenseResource& removed{ m_DenseResources[dense_index] };
+
+    SafeRelease(removed.Resource);
+
+    std::swap(m_DenseResources[dense_index], m_DenseResources[last_dense]);
+
+    m_SparseResources[moved_sparse].DenseIndex = dense_index;
+
+    m_DenseResources.PopBack();
+
+    ++slot.Generation;
+    m_FreeSparseResources.PushBack(sparse_index);
+}
+
+void
+CRHIDevice_DX11::DestroyPipelineLayout(RHIPipelineLayout layout) {
+    if (!Id::IsValid(layout)) {
+        return;
+    }
+
+    const u32 index{ Id::Index(layout) };
+    const u32 gen{ Id::Generation(layout) };
+
+    if (index >= m_PipelineLayouts.Size()) {
+        return;
+    }
+
+    PipelineLayout& ref{ m_PipelineLayouts[index] };
+    if (ref.Generation != gen) {
+        return;
+    }
+
+    ++ref.Generation;
+    m_FreeLayouts.PushBack(index);
+}
+
+void
+CRHIDevice_DX11::DestroyPipeline(RHIPipeline pso) {
+    if (!Id::IsValid(pso)) {
+        return;
+    }
+
+    const u32 index{ Id::Index(pso) };
+    const u32 gen{ Id::Generation(pso) };
+
+    if (index >= m_Pipelines.Size()) {
+        return;
+    }
+
+    PipelineData& data{ m_Pipelines[index] };
+    if (data.Generation != gen) {
+        return;
+    }
+
+    if (data.Graphics) {
+        GraphicsPipeline& ref{ m_GraphicsPipelines[data.Index] };
+        m_VertexShaders.Release(ref.VS);
+        m_PixelShaders.Release(ref.PS);
+        m_DomainShaders.Release(ref.DS);
+        m_HullShaders.Release(ref.HS);
+        m_GeometryShaders.Release(ref.GS);
+        m_BlendStates.Release(ref.Blend);
+        m_RasterStates.Release(ref.Rasterizer);
+        m_DepthStates.Release(ref.Depth);
+    }
+    else {
+        ComputePipeline& ref{ m_ComputePipelines[data.Index] };
+        m_ComputeShaders.Release(ref.CS);
+    }
+
+    ++data.Generation;
+    m_FreePipelines.PushBack(index);
+}
+
+void
 CRHIDevice_DX11::GetFeatures(
     DeviceFeatures* features) {
     if (!features)
@@ -265,92 +1150,45 @@ CRHIDevice_DX11::GetNative() const {
     return m_Device;
 }
 
-CRHIResource_DX11::CRHIResource_DX11(ID3D11Device* const device,
-    const ResourceInitInfo& info)
-    : m_Buffer() {
-    if (!device) {
-        return;
-    }
+ID3D11Resource* const
+CRHIDevice_DX11::ResolveResource(RHIResource handle) const {
+    u32 index{ Id::Index(handle) };
+    u32 gen{ Id::Index(handle) };
 
-    u32 cpu_flags{ 0 };
-    if (info.CPURead) cpu_flags |= D3D11_CPU_ACCESS_READ;
-    if (info.CPUWrite) cpu_flags |= D3D11_CPU_ACCESS_WRITE;
+    const auto& slot{ m_SparseResources[index] };
+    if (slot.Generation != gen)
+        return nullptr;
 
-    const DXGI_FORMAT format{ Shared::ConvertFormat(info.Format) };
-    const D3D11_USAGE usage{ ConvertUsage(info.Usage) };
-    const u32 bind_flags{ ConvertResourceBindFlags((ResourceFlags::Flags)info.Flags) };
-    const u32 misc_flags{ ConvertResourceMiscFlags((ResourceFlags::Flags)info.Flags) };
-
-    switch (info.Dimension)
-    {
-    case ResourceDimension::Buffer: {
-        D3D11_BUFFER_DESC desc{};
-        desc.ByteWidth = info.Width;
-        desc.Usage = usage;
-        desc.BindFlags = bind_flags;
-        desc.CPUAccessFlags = cpu_flags;
-        desc.MiscFlags = misc_flags;
-        desc.StructureByteStride = info.StructuredStride;
-
-        device->CreateBuffer(&desc, nullptr, &m_Buffer);
-    } break;
-    case ResourceDimension::Texture1D: {
-        D3D11_TEXTURE1D_DESC desc{};
-        desc.Width = info.Width;
-        desc.MipLevels = info.MipLevels;
-        desc.ArraySize = info.DepthOrArray;
-        desc.Format = format;
-        desc.Usage = usage;
-        desc.BindFlags = bind_flags;
-        desc.CPUAccessFlags = cpu_flags;
-        desc.MiscFlags = misc_flags;
-
-        device->CreateTexture1D(&desc, nullptr, &m_Texture1D);
-    } break;
-    case ResourceDimension::Texture2D: {
-        D3D11_TEXTURE2D_DESC desc{};
-        desc.Width = info.Width;
-        desc.Height = info.Height;
-        desc.MipLevels = info.MipLevels;
-        desc.ArraySize = info.DepthOrArray;
-        desc.Format = format;
-        desc.SampleDesc = { 1, 0 };
-        desc.Usage = usage;
-        desc.BindFlags = bind_flags;
-        desc.CPUAccessFlags = cpu_flags;
-        desc.MiscFlags = misc_flags;
-
-        device->CreateTexture2D(&desc, nullptr, &m_Texture2D);
-    } break;
-    case ResourceDimension::Texture3D: {
-        D3D11_TEXTURE3D_DESC desc{};
-        desc.Width = info.Width;
-        desc.Height = info.Height;
-        desc.Depth = info.DepthOrArray;
-        desc.MipLevels = info.MipLevels;
-        desc.Format = format;
-        desc.Usage = usage;
-        desc.BindFlags = bind_flags;
-        desc.CPUAccessFlags = cpu_flags;
-        desc.MiscFlags = misc_flags;
-
-        device->CreateTexture3D(&desc, nullptr, &m_Texture3D);
-    } break;
-    default:
-        LOG_WARNING("Invalid resource dimension!");
-        break;
-    }
+    return m_DenseResources[slot.DenseIndex].Resource;
 }
 
-void
-CRHIResource_DX11::Release() {
-    SafeRelease(m_Buffer);
-    delete this;
+const
+CRHIDevice_DX11::PipelineData
+CRHIDevice_DX11::ResolvePipelineData(RHIPipeline pso) const {
+    if (!Id::IsValid(pso)) {
+        return {};
+    }
+
+    u32 index{ Id::Index(pso) };
+    u32 gen{ Id::Index(pso) };
+
+    const auto& slot{ m_Pipelines[index] };
+    if (slot.Generation != gen)
+        return {};
+
+    return slot;
 }
 
-void* const
-CRHIResource_DX11::GetNative() const {
-    return m_Buffer;
+const
+CRHIDevice_DX11::GraphicsPipeline&
+CRHIDevice_DX11::ResolveGraphicsPipeline(const PipelineData& data) const {
+    return m_GraphicsPipelines[data.Index];
+}
+
+const
+CRHIDevice_DX11::ComputePipeline&
+CRHIDevice_DX11::ResolveComputePipeline(const PipelineData& data) const {
+    return m_ComputePipelines[data.Index];
 }
 
 CRHISurface_DX11::CRHISurface_DX11(
@@ -446,6 +1284,8 @@ CRHIFrameGraph_DX11::Initialize(
     if (!device) {
         return Result::ENullptr;
     }
+
+    m_Device = device;
 
     const Vector<Vector<u32>> dependencies{ GetDependencies(builder) };
     if ((u32)(flags & FGCompileFlags::LogInfo)) {
@@ -809,8 +1649,12 @@ CRHIFrameGraph_DX11::Execute(
     u64 frameNumber) {
     CRHISurface_DX11* const dx_surface{ (CRHISurface_DX11* const)surface };
 
-    ID3D11DeviceContext4* const ctx{ m_Ctx };
+    Cmd::CommandListData cmd_data{};
+    cmd_data.Ctx = m_Ctx;
+    cmd_data.Device = m_Device;
+
     RHICommandBuilder builder{ 1024 * 1024 };
+    builder.Reset();
 
     for (auto& pass : m_Passes) {
         const u32 num_rtvs{ pass.NumRtvs };
@@ -834,7 +1678,7 @@ CRHIFrameGraph_DX11::Execute(
             }
 
             if (pass.HasTargetClear(i)) {
-                ctx->ClearRenderTargetView(targets[i],
+                cmd_data.Ctx->ClearRenderTargetView(targets[i],
                     &pass.RtvClearValues[i].X);
             }
         }
@@ -850,16 +1694,16 @@ CRHIFrameGraph_DX11::Execute(
             if (pass.HasDepthClear()) {
 
                 //TODO: Only depth or stencil???
-                ctx->ClearDepthStencilView(depth,
+                cmd_data.Ctx->ClearDepthStencilView(depth,
                     D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL,
                     pass.DepthClearValue.Depth,
                     pass.DepthClearValue.Stencil);
             }
         }
 
-        ctx->OMSetRenderTargets(num_rtvs, &targets[0], depth);
+        cmd_data.Ctx->OMSetRenderTargets(num_rtvs, &targets[0], depth);
         pass.Func(builder);
-        //PARSE
+        Cmd::ParseCommandStream(builder, cmd_data);
         builder.Reset();
     }
 

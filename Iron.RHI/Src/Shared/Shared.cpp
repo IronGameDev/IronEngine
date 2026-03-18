@@ -11,8 +11,6 @@
 
 namespace Iron::RHI {
 namespace {
-using PFN_CREATE_DXGI_FACTORY_2 = decltype(&CreateDXGIFactory2);
-
 #pragma warning(push)
 #pragma warning(disable : 4996)//TODO: Properly handle wchar conversion
 
@@ -53,8 +51,6 @@ public:
     void* const GetNative() const override;
 
 private:
-    HMODULE                     m_DxgiDll;
-    PFN_CREATE_DXGI_FACTORY_2   m_CreateFactory;
     IDXGIFactory7*              m_Factory;
     std::vector<CRHIAdapter>    m_Adapters;
     u32                         m_SupportsTearing;
@@ -82,24 +78,10 @@ private:
 };
 
 CRHIFactory::CRHIFactory()
-    : m_DxgiDll(),
-    m_CreateFactory(),
-    m_Factory(),
+    : m_Factory(),
     m_Adapters(),
     m_SupportsTearing(),
     m_EnableDebug() {
-    m_DxgiDll = LoadLibraryExA("dxgi.dll", 0, LOAD_LIBRARY_SEARCH_SYSTEM32);
-    if (!m_DxgiDll) {
-        LOG_FATAL("Failed to load dxgi.dll!");
-        return;
-    }
-
-    m_CreateFactory = (PFN_CREATE_DXGI_FACTORY_2)GetProcAddress(m_DxgiDll, "CreateDXGIFactory2");
-    if (!m_CreateFactory) {
-        LOG_FATAL("Failed to get CreateDXGIFactory2() from dxgi.dll!");
-        return;
-    }
-
     std::filesystem::path ConfigPath{ "D:\\code\\IronEngine\\" };
     ConfigPath.append("settings.ini");
     ConfigFile Config{};
@@ -114,7 +96,7 @@ CRHIFactory::CRHIFactory()
     }
 
     HRESULT hr{ S_OK };
-    hr = m_CreateFactory(0, IID_PPV_ARGS(&m_Factory));
+    hr = CreateDXGIFactory2(0, IID_PPV_ARGS(&m_Factory));
     if (FAILED(hr)) {
         LOG_FATAL("Failed to create dxgi factory!");
         return;
@@ -137,9 +119,6 @@ CRHIFactory::Release() {
     }
 
     SafeRelease(m_Factory);
-    if (m_DxgiDll) {
-        FreeLibrary(m_DxgiDll);
-    }
 
     delete this;
 }

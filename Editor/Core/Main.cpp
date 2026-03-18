@@ -26,7 +26,7 @@ public:
             return Result::ELoadlibrary;
 
         IShaderCompiler* compiler{};
-        assets->CreateShaderCompiler({ 6, 6, 0 }, &compiler);
+        assets->CreateShaderCompiler({ 5, 0, 0 }, &compiler);
         if (!compiler)
             return Result::ECreateResource;
 
@@ -38,16 +38,16 @@ public:
         info.NumDefines = 0;
 
         IShader* shader{};
-        compiler->CompileShaderFromFile("D:\\code\\IronEngine\\EngineAssets\\D3D12\\FullscreenVS.hlsl",
+        compiler->CompileShaderFromFile("D:\\code\\IronEngine\\EngineAssets\\DXCommon\\FullscreenVS.hlsl",
             info, &shader);
-        if (shader) shader->SaveToFile("D:\\code\\IronEngine\\EngineAssets\\D3D12\\Bin\\FullscreenVS.bin");
+        if (shader) shader->SaveToFile("D:\\code\\IronEngine\\EngineAssets\\D3D11\\Bin\\FullscreenVS.bin");
         SafeRelease(shader);
 
         info.Type = RHI::ShaderType::Pixel;
         info.Entry = "ColorPS";
-        compiler->CompileShaderFromFile("D:\\code\\IronEngine\\EngineAssets\\D3D12\\ColorPS.hlsl",
+        compiler->CompileShaderFromFile("D:\\code\\IronEngine\\EngineAssets\\DXCommon\\ColorPS.hlsl",
             info, &shader);
-        if (shader) shader->SaveToFile("D:\\code\\IronEngine\\EngineAssets\\D3D12\\Bin\\ColorPS.bin");
+        if (shader) shader->SaveToFile("D:\\code\\IronEngine\\EngineAssets\\D3D11\\Bin\\ColorPS.bin");
         SafeRelease(shader);
 
         UnloadPlugin("Iron.AssetCompiler.dll");

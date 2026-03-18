@@ -2,8 +2,52 @@
 #include <Iron.RHI/RHI.h>
 
 #include <dxgi1_6.h>
+#include <d3dcommon.h>
+
+#define LOG_HR(hr) LOG_ERROR(Iron::RHI::Shared::HrToString(hr));
 
 namespace Iron::RHI::Shared {
+static const char* HrToString(HRESULT hr) {
+    static char buffer[512];
+
+    FormatMessageA(
+        FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+        nullptr,
+        hr,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        buffer,
+        sizeof(buffer),
+        nullptr
+    );
+
+    return buffer;
+}
+
+static u64
+HashBytes(const void* data, size_t size, u64 hash = 1469598103934665603ull) {
+    const uint8_t* bytes = reinterpret_cast<const uint8_t*>(data);
+    for (size_t i = 0; i < size; ++i) {
+        hash ^= bytes[i];
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
+template<typename T>
+static u64
+HashStruct(const T& s, u64 hash) {
+    return HashBytes(&s, sizeof(T), hash);
+}
+
+static u64
+HashShaderBytecode(const RHIBlob& bc, u64 hash) {
+    hash = HashBytes(&bc.Size, sizeof(bc.Size), hash);
+    if (bc.Blob && bc.Size > 0) {
+        hash = HashBytes(bc.Blob, bc.Size, hash);
+    }
+    return hash;
+}
+
 struct ViewCacheEntry {
     u32                 Resource;
     RHIFormat::Fmt      Format;
@@ -49,5 +93,28 @@ inline bool operator==(const ViewCacheEntry& a, const ViewCacheEntry& b) noexcep
 constexpr static DXGI_FORMAT
 ConvertFormat(RHIFormat::Fmt fmt) {
 	return (DXGI_FORMAT)fmt;
+}
+
+constexpr static D3D_PRIMITIVE_TOPOLOGY
+ConvertTopology(PrimitiveTopology::Val val) {
+    switch (val)
+    {
+    case PrimitiveTopology::Unknown:
+        return D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
+    case PrimitiveTopology::PointList:
+        return D3D_PRIMITIVE_TOPOLOGY_POINTLIST;
+    case PrimitiveTopology::LineList:
+        return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
+    case PrimitiveTopology::LineStrip:
+        return D3D_PRIMITIVE_TOPOLOGY_LINESTRIP;
+    case PrimitiveTopology::TriangleList:
+        return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    case PrimitiveTopology::TriangleStrip:
+        return D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+    case PrimitiveTopology::TriangleFan:
+        return D3D_PRIMITIVE_TOPOLOGY_TRIANGLEFAN;
+    default:
+        return D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
+    }
 }
 }

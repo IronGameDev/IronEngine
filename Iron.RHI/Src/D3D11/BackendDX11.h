@@ -2,6 +2,7 @@
 
 #include <d3d11_4.h>
 #include <dxgi1_6.h>
+#include <unordered_map>
 
 namespace Iron::RHI::D3D11 {
 template<typename T>
@@ -53,6 +54,118 @@ struct D3D11FeatureTraits<D3D11_FEATURE_DATA_D3D11_OPTIONS6> {
 
 class CRHIDevice_DX11 : public IRHIDevice {
 public:
+    struct ResourceSlot {
+        u32         Generation : Id::GenerationBits{};
+        u32         DenseIndex : (32 - Id::GenerationBits) {};
+    };
+
+    struct DenseResource {
+        enum ResourceType : u32 {
+            EBuffer = 0,
+            ETexture1D,
+            ETexture2D,
+            ETexture3D,
+        };
+
+        u32             Type : 2;
+        u32             SparseIndex : 30;
+        ID3D11Resource* Resource;
+    };
+
+    struct PipelineLayout {
+        u32                     Start{};
+        u32                     Count{};
+        u32                     Generation{};
+    };
+
+    template<typename T>
+    struct PsoHandle {
+        T*                      Ptr;
+        u32                     Index;
+
+        constexpr bool IsValid() const {
+            return Ptr != nullptr;
+        }
+    };
+
+    template<typename T>
+    struct RefCountedStorage {
+    public:
+        PsoHandle<T> Retrieve(u64 hash) {
+            auto it{ m_HashMap.find(hash) };
+            if (it != m_HashMap.end()) {
+                const u32 index{ it->second };
+                m_Data[index].RefCount++;
+                return { m_Data[index].Ptr, index };
+            }
+
+            return { nullptr, 0 };
+        }
+
+        PsoHandle<T> AddNewItem(u64 hash, T* ptr) {
+            const u32 index{ m_Data.Size() };
+            m_HashMap[hash] = index;
+            m_Data.EmplaceBack(ptr, hash, 1);
+            return {  ptr, index };
+        }
+
+        void Release(PsoHandle<T>& handle) {
+            if (handle.Index >= m_Data.Size()) {
+                return;
+            }
+
+            if (!handle.Ptr) {
+                return;
+            }
+
+            Item& it{ m_Data[handle.Index] };
+            if (--it.RefCount > 0) {
+                return;
+            }
+
+            SafeRelease(it.Ptr);
+            m_HashMap.erase(it.Hash);
+            it.Ptr = nullptr;
+            handle.Ptr = nullptr;
+        }
+
+    private:
+        struct Item {
+            T*                  Ptr;
+            u64                 Hash;
+            u32                 RefCount;
+        };
+
+        Vector<Item>                    m_Data;
+        std::unordered_map<u64, u32>    m_HashMap;
+
+    };
+
+    struct ComputePipeline {
+        RHIPipelineLayout               Layout;
+        PsoHandle<ID3D11ComputeShader>  CS;
+    };
+
+    struct GraphicsPipeline {
+        RHIPipelineLayout                   Layout;
+        PsoHandle<ID3D11VertexShader>       VS;
+        PsoHandle<ID3D11PixelShader>        PS;
+        PsoHandle<ID3D11DomainShader>       DS;
+        PsoHandle<ID3D11HullShader>         HS;
+        PsoHandle<ID3D11GeometryShader>     GS;
+        PsoHandle<ID3D11BlendState1>        Blend;
+        PsoHandle<ID3D11RasterizerState2>   Rasterizer;
+        PsoHandle<ID3D11DepthStencilState>  Depth;
+        u32                                 SampleMask;
+    };
+
+    struct PipelineData {
+        u32                             Graphics : 1;
+        u32                             Generation : 31;
+        u32                             Index;
+    };
+
+public:
     CRHIDevice_DX11(
         IRHIFactory* const factory,
         IRHIAdapter* const adapter,
@@ -63,13 +176,19 @@ public:
 
     Result::Code CreateResource(
         const ResourceInitInfo& info,
-        IRHIResource** resource) override;
+        RHIResource* resource) override;
 
     Result::Code CreatePipelineLayout(
         const PipelineLayoutInitInfo& info,
-        IRHIPipelineLayout** outHandle) override {
-        return Result::Ok;
-    }
+        RHIPipelineLayout* outHandle) override;
+
+    Result::Code CreateComputePipeline(
+        const ComputePipelineInitInfo& info,
+        RHIPipeline* outHandle) override;
+
+    Result::Code CreateGraphicsPipeline(
+        const GraphicsPipelineInitInfo& info,
+        RHIPipeline* outHandle) override;
 
     Result::Code CreateSurface(
         const SurfaceInitInfo& info,
@@ -79,6 +198,15 @@ public:
         const RHIGraphBuilder& builder,
         u32 flags,
         IRHIFrameGraph** outHandle) override;
+
+    void DestroyResource(
+        RHIResource resource) override;
+
+    void DestroyPipelineLayout(
+        RHIPipelineLayout layout) override;
+
+    void DestroyPipeline(
+        RHIPipeline pso) override;
 
     void GetFeatures(
         DeviceFeatures* features) override;
@@ -106,35 +234,46 @@ public:
         return data;
     }
 
-private:
-    IRHIFactory*            m_Factory;
-    bool                    m_Debug;
-
-    HMODULE                 m_D3D11Dll;
-    PFN_D3D11_CREATE_DEVICE m_D3D11CreateDevice;
-    D3D_FEATURE_LEVEL       m_FeatureLevel;
-
-    ID3D11Device5*          m_Device;
-    ID3D11DeviceContext4*   m_Context;
-
-    DeviceFeatures          m_Features;
-};
-
-class CRHIResource_DX11 : public IRHIResource {
-public:
-    CRHIResource_DX11(ID3D11Device* const device,
-        const ResourceInitInfo& info);
-
-    void Release() override;
-    void* const GetNative() const override;
+    ID3D11Resource* const ResolveResource(RHIResource handle) const;
+    const PipelineData ResolvePipelineData(RHIPipeline pso) const;
+    const GraphicsPipeline& ResolveGraphicsPipeline(const PipelineData& data) const;
+    const ComputePipeline& ResolveComputePipeline(const PipelineData& data) const;
 
 private:
-    union {
-        ID3D11Buffer*           m_Buffer;
-        ID3D11Texture1D*        m_Texture1D;
-        ID3D11Texture2D*        m_Texture2D;
-        ID3D11Texture3D*        m_Texture3D;
-    };
+    IRHIFactory*                m_Factory;
+    bool                        m_Debug;
+
+    HMODULE                     m_D3D11Dll;
+    PFN_D3D11_CREATE_DEVICE     m_D3D11CreateDevice;
+    D3D_FEATURE_LEVEL           m_FeatureLevel;
+
+    ID3D11Device5*              m_Device;
+    ID3D11DeviceContext4*       m_Context;
+
+    DeviceFeatures              m_Features;
+
+    Vector<ResourceSlot>        m_SparseResources;
+    Vector<DenseResource>       m_DenseResources;
+    Vector<u32>                 m_FreeSparseResources;
+
+    Vector<PipelineLayoutParam> m_PipelineParams;
+    Vector<PipelineLayout>      m_PipelineLayouts;
+    Vector<u32>                 m_FreeLayouts;
+
+    Vector<ComputePipeline>     m_ComputePipelines;
+    Vector<GraphicsPipeline>    m_GraphicsPipelines;
+    Vector<PipelineData>        m_Pipelines;
+    Vector<u32>                 m_FreePipelines;
+
+    RefCountedStorage<ID3D11ComputeShader>      m_ComputeShaders;
+    RefCountedStorage<ID3D11VertexShader>       m_VertexShaders;
+    RefCountedStorage<ID3D11PixelShader>        m_PixelShaders;
+    RefCountedStorage<ID3D11DomainShader>       m_DomainShaders;
+    RefCountedStorage<ID3D11GeometryShader>     m_GeometryShaders;
+    RefCountedStorage<ID3D11HullShader>         m_HullShaders;
+    RefCountedStorage<ID3D11BlendState1>        m_BlendStates;
+    RefCountedStorage<ID3D11RasterizerState2>   m_RasterStates;
+    RefCountedStorage<ID3D11DepthStencilState>  m_DepthStates;
 };
 
 class CRHISurface_DX11 : public IRHISurface {
@@ -270,6 +409,7 @@ private:
     Vector<ID3D11DepthStencilView*>     m_DsvHeap;
     
     //TODO: FIX TS
-    ID3D11DeviceContext4*               m_Ctx;
+    ID3D11DeviceContext4*               m_Ctx{};
+    CRHIDevice_DX11*                    m_Device{};
 };
 }

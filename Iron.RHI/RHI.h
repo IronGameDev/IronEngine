@@ -47,15 +47,19 @@ public:
 
     virtual Result::Code CreateResource(
         const ResourceInitInfo& info,
-        IRHIResource** resource) = 0;
+        RHIResource* resource) = 0;
 
     virtual Result::Code CreatePipelineLayout(
         const PipelineLayoutInitInfo& info,
-        IRHIPipelineLayout** outHandle) = 0;
+        RHIPipelineLayout* outHandle) = 0;
 
-    //virtual Result::Code CreateComputePipeline(
-    //    const ComputePipelineInitInfo& info,
-    //    IRHIPipelineLayout** outHandle) = 0;
+    virtual Result::Code CreateComputePipeline(
+        const ComputePipelineInitInfo& info,
+        RHIPipeline* outHandle) = 0;
+
+    virtual Result::Code CreateGraphicsPipeline(
+        const GraphicsPipelineInitInfo& info,
+        RHIPipeline* outHandle) = 0;
 
     virtual Result::Code CreateSurface(
         const SurfaceInitInfo& info,
@@ -66,30 +70,17 @@ public:
         u32 flags,
         IRHIFrameGraph** outHandle) = 0;
 
+    virtual void DestroyResource(
+        RHIResource resource) = 0;
+
+    virtual void DestroyPipelineLayout(
+        RHIPipelineLayout layout) = 0;
+
+    virtual void DestroyPipeline(
+        RHIPipeline pso) = 0;
 
     virtual void GetFeatures(
         DeviceFeatures* features) = 0;
-
-    virtual void* const GetNative() const = 0;
-};
-
-class IRHIResource : public IObjectBase {
-public:
-    virtual ~IRHIResource() = default;
-
-    virtual void* const GetNative() const = 0;
-};
-
-class IRHIPipelineLayout : public IObjectBase {
-public:
-    virtual ~IRHIPipelineLayout() = default;
-
-    virtual void* const GetNative() const = 0;
-};
-
-class IRHIPipeline : public IObjectBase {
-public:
-    virtual ~IRHIPipeline() = default;
 
     virtual void* const GetNative() const = 0;
 };

@@ -9,14 +9,14 @@ All functional interfaces should only be defined in RHI.h
 #pragma once
 #include <Iron.Core/Core.h>
 
-#define RHI_TEMPORAL_COUNT_BITS 4
-#define RHI_VIEW_INDEX_BITS 12
-#define RHI_COMMAND_ALIGN 8
 #define RHI_MAX_NAME 128
 #define RHI_MAX_SAMPLERS 128
 #define RHI_MAX_TEMPORAL 1 << RHI_TEMPORAL_COUNT_BITS
 #define RHI_MAX_VIEWS_PER_TYPE (1 << RHI_VIEW_INDEX_BITS) - 1
 #define RHI_MAX_TARGET_COUNT 8
+#define RHI_TEMPORAL_COUNT_BITS 4
+#define RHI_VIEW_INDEX_BITS 12
+#define RHI_COMMAND_ALIGN 8
 
 #ifndef RHI_ENABLE_STREAM_CHECK
 #define RHI_ENABLE_STREAM_CHECK 1
@@ -30,13 +30,13 @@ All functional interfaces should only be defined in RHI.h
 
 namespace Iron::RHI {
 typedef u32 FGResource;
+typedef TypeId RHIResource;
+typedef TypeId RHIPipeline;
+typedef TypeId RHIPipelineLayout;
 class RHICommandBuilder;
 class RHIGraphBuilder;
 class IRHIAdapter;
 class IRHIDevice;
-class IRHIResource;
-class IRHIPipelineLayout;
-class IRHIPipeline;
 class IRHISurface;
 class IRHIFrameGraph;
 
@@ -282,6 +282,124 @@ struct PipelineLayoutParamType {
     };
 };
 
+struct Blend {
+    enum Type : u32 {
+        Zero = 0,
+        One,
+        SrcColor,
+        InvSrcColor,
+        SrcAlpha,
+        InvSrcAlpha,
+        DstColor,
+        InvDstColor,
+        DstAlpha,
+        InvDstAlpha,
+        BlendFactor,
+    };
+};
+
+struct BlendOp {
+    enum Op : u32 {
+        Add,
+        Sub,
+        RevSub,
+        Min,
+        Max,
+    };
+};
+
+struct LogicOp {
+    enum Op : u32 {
+        Clear = 0,
+        Set,
+        Copy,
+        CopyInv,
+        Noop,
+        Inv,
+        And,
+        Nand,
+        Or,
+        Nor,
+        Xor,
+        Equiv,
+        AndRev,
+        AndInv,
+        OrRev,
+        OrInv
+    };
+};
+
+struct FillMode {
+    enum Mode : u32 {
+        Wireframe = 0,
+        Solid
+    };
+};
+
+struct CullMode {
+    enum Mode : u32 {
+        None = 0,
+        Front,
+        Back
+    };
+};
+
+struct ComparisonFunc {
+    enum Func : u32 {
+        None = 0,
+        Never,
+        Less,
+        Equal,
+        LessEqual,
+        Greater,
+        NotEqual,
+        GreaterEqual,
+        Always
+    };
+};
+
+struct StencilOp {
+    enum Op : u32 {
+        Keep = 0,
+        Zero,
+        Replace,
+        IncrSat,
+        DecrSat,
+        Inv,
+        Incr,
+        Decr
+    };
+};
+
+struct InputRate {
+    enum Rate : u32 {
+        PerVertex = 0,
+        PerInstance,
+    };
+};
+
+struct PrimitiveTopologyType {
+    enum Type : u32 {
+        Unknown = 0,
+        Point,
+        Line,
+        Triangle,
+        Patch
+    };
+};
+
+struct PrimitiveTopology {
+    enum Val : u32 {
+        Unknown = 0,
+        PointList,
+        LineList,
+        LineStrip,
+        TriangleList,
+        TriangleStrip,
+        TriangleFan,
+    };
+};
+
 struct FGResourceType {
     enum Type : u32 {
         Texture = 0,
@@ -338,12 +456,33 @@ struct ResourceInitInfo {
 };
 
 struct SurfaceInitInfo {
-    void*               Native;
-    u32                 Width;
-    u32                 Height;
-    RHIFormat::Fmt      Format;
-    bool                TripleBuffering;
-    bool                AllowTearing;
+    void*                           Native;
+    u32                             Width;
+    u32                             Height;
+    RHIFormat::Fmt                  Format;
+    bool                            TripleBuffering;
+    bool                            AllowTearing;
+};
+
+struct RHIBlob {
+    u8*                             Blob;
+    u64                             Size;
+};
+
+struct Viewport {
+    f32                             TopLeftX;
+    f32                             TopLeftY;
+    f32                             Width;
+    f32                             Height;
+    f32                             MinDepth;
+    f32                             MaxDepth;
+};
+
+struct ScissorRect {
+    u32                             Left;
+    u32                             Top;
+    u32                             Right;
+    u32                             Bottom;
 };
 
 struct SubresourceRange {
@@ -436,7 +575,126 @@ struct PipelineLayoutInitInfo {
     u32                             PushConstantSize;
 };
 
+struct TargetBlendInitInfo {
+    bool                            BlendEnable;
+    bool                            LogicOpEnable;
+    Blend::Type                     SrcBlend;
+    Blend::Type                     DstBlend;
+    BlendOp::Op                     BlendOp;
+    Blend::Type                     SrcBlendAlpha;
+    Blend::Type                     DstBlendAlpha;
+    BlendOp::Op                     BlendOpAlpha;
+    LogicOp::Op                     LogicOp;
+    u8                              TargetMask;
+};
+
+struct PipelineBlendInitInfo {
+    bool                            AlphaToCoverageEnable;
+    bool                            IndependentBlendEnable;
+    TargetBlendInitInfo             Targets[RHI_MAX_TARGET_COUNT];
+};
+
+struct PipelineRasterizerInitInfo {
+    FillMode::Mode                  Fill;
+    CullMode::Mode                  Cull;
+    bool                            FrontCounterClockwise;
+    s32                             DepthBias;
+    float                           DepthBiasClamp;
+    float                           SlopeScaledDepthBias;
+    bool                            DepthClipEnable;
+    bool                            MultisampleEnable;
+    bool                            AntialiasedLineEnable;
+    u32                             ForcedSampleCount;
+    bool                            ConservativeRaster;
+};
+
+struct PipelineDepthStencilOpInitInfo {
+    StencilOp::Op                   StencilFailOp;
+    StencilOp::Op                   StencilDepthFailOp;
+    StencilOp::Op                   StencilPassOp;
+    ComparisonFunc::Func            StencilFunc;
+};
+
+struct PipelineDepthStencilInitInfo {
+    bool                            DepthEnable;
+    bool                            DepthWriteAll;
+    ComparisonFunc::Func            DepthFunc;
+    bool                            StencilEnable;
+    u8                              StencilReadMask;
+    u8                              StencilWriteMask;
+    PipelineDepthStencilOpInitInfo  FrontFace;
+    PipelineDepthStencilOpInitInfo  BackFace;
+};
+
+struct PipelineInputElementInitInfo {
+    const char*                     Name;
+    u32                             Index;
+    RHIFormat::Fmt                  Format;
+    u32                             InputSlot;
+    u32                             AlignedOffset;
+    InputRate::Rate                 Rate;
+    u32                             InstanceStepRate;
+};
+
+struct PipelineInputAssemblerInitInfo {
+    PipelineInputElementInitInfo*   Elements;
+    u32                             NumElements;
+};
+
 struct ComputePipelineInitInfo {
+    RHIPipelineLayout               Layout;
+    RHIBlob                         CS;
+};
+
+struct GraphicsPipelineInitInfo {
+    RHIPipelineLayout               Layout{ Id::InvalidId };
+    RHIBlob                         VS{};
+    RHIBlob                         PS{};
+    RHIBlob                         DS{};
+    RHIBlob                         HS{};
+    RHIBlob                         GS{};
+    PipelineBlendInitInfo           Blend{};
+    u32                             SampleMask{};
+    PipelineRasterizerInitInfo      Rasterizer{};
+    PipelineDepthStencilInitInfo    DepthStencil{};
+    PipelineInputAssemblerInitInfo  InputAssembler{};
+    PrimitiveTopologyType::Type     PrimitiveTopology{};
+    u32                             NumTargets{};
+    RHIFormat::Fmt                  TargetFormats[RHI_MAX_TARGET_COUNT]{};
+    RHIFormat::Fmt                  DepthFormat{};
+
+    constexpr GraphicsPipelineInitInfo(RHIPipelineLayout layout)
+        : Layout(layout) {
+        for (auto& tgt : Blend.Targets) {
+            tgt = {};
+            tgt.BlendEnable = false;
+            tgt.LogicOpEnable = false;
+            tgt.TargetMask = 0xf;
+        }
+        Rasterizer.Fill = FillMode::Solid;
+        Rasterizer.Cull = CullMode::Back;
+        Rasterizer.FrontCounterClockwise = false;
+        Rasterizer.DepthBias = 0;
+        Rasterizer.DepthBiasClamp = 0.f;
+        Rasterizer.SlopeScaledDepthBias = 0;
+        Rasterizer.DepthClipEnable = true;
+        Rasterizer.MultisampleEnable = false;
+        Rasterizer.AntialiasedLineEnable = false;
+        Rasterizer.ForcedSampleCount = 0;
+        Rasterizer.ConservativeRaster = false;
+
+        DepthStencil.DepthEnable = true;
+        DepthStencil.DepthWriteAll = true;
+        DepthStencil.DepthFunc = ComparisonFunc::LessEqual;
+        DepthStencil.StencilEnable = false;
+        DepthStencil.StencilReadMask = 0;
+        DepthStencil.StencilWriteMask = 0;
+        DepthStencil.FrontFace = {};
+        DepthStencil.BackFace = {};
+
+        SampleMask = (u32)~0;
+        PrimitiveTopology = PrimitiveTopologyType::Triangle;
+    }
 };
 
 struct FGResourceInitInfo {
@@ -529,6 +787,10 @@ public:
             CopyResource,
             SetGraphicsLayout,
             SetComputeLayout,
+            SetPipeline,
+            SetPrimitiveTopology,
+            SetViewports,
+            SetScissors,
             Draw,
             DrawInstanced,
             DrawIndexed,
@@ -537,23 +799,40 @@ public:
         };
     };
 
-    struct CmdHeader
-    {
+    struct CmdHeader {
         u32         Id;
         u32         PayloadSize;
     };
 
     struct CmdCopyResourceInfo {
-        IRHIResource*           Src;
-        IRHIResource*           Dst;
+        RHIResource             Src;
+        RHIResource             Dst;
     };
 
     struct CmdSetGraphicsLayoutInfo {
-        IRHIPipelineLayout*     Layout;
+        RHIPipelineLayout       Layout;
     };
 
     struct CmdSetComputeLayoutInfo {
-        IRHIPipelineLayout*     Layout;
+        RHIPipelineLayout       Layout;
+    };
+
+    struct CmdSetPipelineInfo {
+        RHIPipeline             Pso;
+    };
+
+    struct CmdSetPrimitiveTopologyInfo {
+        PrimitiveTopology::Val  Topology;
+    };
+
+    struct CmdSetViewportsInfo {
+        Viewport                Views[RHI_MAX_TARGET_COUNT];
+        u32                     Count;
+    };
+
+    struct CmdSetScissorsInfo {
+        ScissorRect             Rects[RHI_MAX_TARGET_COUNT];
+        u32                     Count;
     };
 
     struct CmdDrawInfo {
@@ -641,24 +920,54 @@ public:
     }
 
 public:
-    inline void CopyResource(IRHIResource* Src,
-        IRHIResource* Dst) {
+    inline void CopyResource(RHIResource Src,
+        RHIResource Dst) {
         auto* cmd{ Allocate<CmdCopyResourceInfo>(CommandId::CopyResource) };
         RHI_VALIDATE_CMD(cmd);
         cmd->Src = Src;
         cmd->Dst = Dst;
     }
 
-    inline void SetGraphicsLayout(IRHIPipelineLayout* layout) {
+    inline void SetGraphicsLayout(RHIPipelineLayout layout) {
         auto* cmd{ Allocate<CmdSetGraphicsLayoutInfo>(CommandId::SetGraphicsLayout) };
         RHI_VALIDATE_CMD(cmd);
         cmd->Layout = layout;
     }
 
-    inline void SetComputeLayout(IRHIPipelineLayout* layout) {
+    inline void SetComputeLayout(RHIPipelineLayout layout) {
         auto* cmd{ Allocate<CmdSetComputeLayoutInfo>(CommandId::SetComputeLayout) };
         RHI_VALIDATE_CMD(cmd);
         cmd->Layout = layout;
+    }
+
+    inline void SetPipeline(RHIPipeline pso) {
+        auto* cmd{ Allocate<CmdSetPipelineInfo>(CommandId::SetPipeline) };
+        RHI_VALIDATE_CMD(cmd);
+        cmd->Pso = pso;
+    }
+
+    inline void SetPrimitiveTopology(PrimitiveTopology::Val topology) {
+        auto* cmd{ Allocate<CmdSetPrimitiveTopologyInfo>(CommandId::SetPrimitiveTopology) };
+        RHI_VALIDATE_CMD(cmd);
+        cmd->Topology = topology;
+    }
+
+    inline void SetViewports(Viewport* const views, u32 count) {
+        auto* cmd{ Allocate<CmdSetViewportsInfo>(CommandId::SetViewports) };
+        RHI_VALIDATE_CMD(cmd);
+        cmd->Count = count;
+        for (u32 i{ 0 }; i < count; ++i) {
+            cmd->Views[i] = views[i];
+        }
+    }
+
+    inline void SetScissors(ScissorRect* const rects, u32 count) {
+        auto* cmd{ Allocate<CmdSetScissorsInfo>(CommandId::SetScissors) };
+        RHI_VALIDATE_CMD(cmd);
+        cmd->Count = count;
+        for (u32 i{ 0 }; i < count; ++i) {
+            cmd->Rects[i] = rects[i];
+        }
     }
 
     inline void Draw(u32 VertexCount,

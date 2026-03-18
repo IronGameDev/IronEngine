@@ -15,7 +15,7 @@
     <ProjectCapability Include="SourceItemsFromImports" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="$(MSBuildThisFileDirectory)D3D12\ColorPS.hlsl" />
-    <FxCompile Include="$(MSBuildThisFileDirectory)D3D12\FullscreenVS.hlsl" />
+    <FxCompile Include="$(MSBuildThisFileDirectory)DXCommon\ColorPS.hlsl" />
+    <FxCompile Include="$(MSBuildThisFileDirectory)DXCommon\FullscreenVS.hlsl" />
   </ItemGroup>
 </Project>

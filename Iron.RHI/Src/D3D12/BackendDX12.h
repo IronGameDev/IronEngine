@@ -4,6 +4,7 @@
 #include <dxgi1_6.h>
 
 #include <vector>
+#include <unordered_map>
 #include <deque>
 
 namespace Iron::RHI::D3D12 {
@@ -175,7 +176,7 @@ struct D3D12FeatureTraits<D3D12_FEATURE_DATA_SHADER_MODEL> {
 };
 
 struct HeapAllocInfo {
-    ID3D12Heap* const       Heap;
+    ID3D12Heap*             Heap;
     u64                     Offset;
     u64                     Size;
     u32                     Order;
@@ -306,6 +307,30 @@ private:
 };
 
 class CRHIDevice_DX12 : public IRHIDevice {
+private:
+    struct ResourceSlot {
+        u32         Generation : Id::GenerationBits{};
+        u32         DenseIndex : (32 - Id::GenerationBits) {};
+    };
+
+    struct DenseResource {
+        u32                 SparseIndex{};
+        HeapAllocInfo       Info{};
+        ID3D12Resource*     Resource{};
+    };
+
+    struct PipelineLayout {
+        ID3D12RootSignature*    RootSig{};
+        u32                     Generation{};
+    };
+
+    struct Pipeline {
+        ID3D12PipelineState*    Pso{};
+        u32                     Generation{};
+        u32                     RefCount{};
+        u64                     Hash{};
+    };
+
 public:
     CRHIDevice_DX12(
         IRHIFactory* const factory,
@@ -317,11 +342,19 @@ public:
 
     Result::Code CreateResource(
         const ResourceInitInfo& info,
-        IRHIResource** resource) override;
+        RHIResource* resource) override;
 
     Result::Code CreatePipelineLayout(
         const PipelineLayoutInitInfo& info,
-        IRHIPipelineLayout** outHandle) override;
+        RHIPipelineLayout* outHandle) override;
+
+    Result::Code CreateComputePipeline(
+        const ComputePipelineInitInfo& info,
+        RHIPipeline* outHandle) override;
+
+    Result::Code CreateGraphicsPipeline(
+        const GraphicsPipelineInitInfo& info,
+        RHIPipeline* outHandle) override;
 
     Result::Code CreateSurface(
         const SurfaceInitInfo& info,
@@ -331,6 +364,15 @@ public:
         const RHIGraphBuilder& builder,
         u32 flags,
         IRHIFrameGraph** outHandle) override;
+
+    void DestroyResource(
+        RHIResource resource) override;
+
+    void DestroyPipelineLayout(
+        RHIPipelineLayout layout) override;
+
+    void DestroyPipeline(
+        RHIPipeline pso) override;
 
     void GetFeatures(
         DeviceFeatures* features) override;
@@ -362,16 +404,9 @@ public:
         return data;
     }
 
-    HRESULT D3D12SerializeVersionedRootSignature(
-        const D3D12_VERSIONED_ROOT_SIGNATURE_DESC* pRootSignature,
-        ID3DBlob** ppBlob,
-        ID3DBlob** ppErrorBlob) {
-        if (!m_SerializeRootSig) {
-            return E_NOINTERFACE;
-        }
-
-        return m_SerializeRootSig(pRootSignature, ppBlob, ppErrorBlob);
-    }
+    ID3D12Resource* const ResolveResource(RHIResource handle) const;
+    ID3D12RootSignature* const ResolveLayout(RHIPipelineLayout layout) const;
+    ID3D12PipelineState* const ResolvePso(RHIPipeline pso) const;
 
 private:
     D3D_FEATURE_LEVEL _GetMaximumFL(IUnknown* const adapter) const;
@@ -391,42 +426,17 @@ private:
 
     DX12BuddyAllocator                              m_BufferHeaps;
     DX12DescriptorHeap                              m_SrvHeap;
-};
 
-class CRHIResource_DX12 : public IRHIResource {
-public:
-    CRHIResource_DX12(ID3D12Resource* ptr,
-        DX12BuddyAllocator* heap,
-        const HeapAllocInfo& alloc)
-        : m_Resource(ptr), m_IsBuffer(true), Buffer{ heap, alloc } {
-    }
+    Vector<ResourceSlot>                            m_SparseResources;
+    Vector<DenseResource>                           m_DenseResources;
+    Vector<u32>                                     m_FreeSparseResources;
 
-    void Release() override;
-    void* const GetNative() const override;
+    Vector<PipelineLayout>                          m_PipelineLayouts;
+    Vector<u32>                                     m_FreeLayouts;
 
-private:
-    ID3D12Resource*         m_Resource;
-    bool                    m_IsBuffer;
-
-    union {
-        struct {
-            DX12BuddyAllocator*     m_BufferHeap;
-            HeapAllocInfo           m_BufferAlloc;
-        } Buffer;
-    };
-};
-
-class CRHIPipelineLayout_DX12 : public IRHIPipelineLayout {
-public:
-    CRHIPipelineLayout_DX12(
-        CRHIDevice_DX12* const device,
-        const PipelineLayoutInitInfo& info);
-
-    void Release() override;
-    void* const GetNative() const override;
-
-private:
-    ID3D12RootSignature*    m_RootSig;
+    Vector<Pipeline>                                m_Pipelines;
+    Vector<u32>                                     m_FreePsos;
+    std::unordered_map<u64, u32>                    m_PsoMap;
 };
 
 class CRHISurface_DX12 : public IRHISurface {
@@ -521,8 +531,7 @@ class CRHIFrameGraph_DX12 : public IRHIFrameGraph {
         Vector<BoundView>       Srvs{};
         Vector<BarrierDesc>     Barriers{};
 
-        FGPassFunc                  Func{};
-        CRHIPipelineLayout_DX12*    RootSig{};
+        FGPassFunc              Func{};
 
         constexpr inline void EnableClearTarget(u16 slot) {
             ClearedBinds |= (1 << (slot + 1));
@@ -619,13 +628,14 @@ class CRHIFrameGraph_DX12 : public IRHIFrameGraph {
             ID3D12CommandList* const lists[]{ List };
             Queue->ExecuteCommandLists(_countof(lists), &lists[0]);
 
-            surface->Present();
-
             const u64 fence_value{ ++FenceValue };
             Frame& frame{ Frames[FrameIndex] };
             frame.FenceValue = fence_value;
 
             Queue->Signal(Fence, fence_value);
+            
+            surface->Present();
+
             FrameIndex = (FrameIndex + 1) % BufferCount;
         }
 
@@ -711,6 +721,8 @@ private:
     }
 
 private:
+    CRHIDevice_DX12*                    m_Parent{};
+
     Vector<Pass>                        m_Passes{};
     Vector<Resource>                    m_DescResources{};
     Vector<View>                        m_DescViews{};

@@ -14,8 +14,7 @@ namespace Iron::RHI::D3D12 {
 namespace {
 constexpr D3D12_HEAP_TYPE
 ConvertHeapType(ResourceUsage::Usage usage) {
-    switch (usage)
-    {
+    switch (usage) {
     case ResourceUsage::Default:
         return D3D12_HEAP_TYPE_DEFAULT;
     case ResourceUsage::Immutable:
@@ -31,8 +30,7 @@ ConvertHeapType(ResourceUsage::Usage usage) {
 
 constexpr D3D12_RESOURCE_DIMENSION
 ConvertResourceDimension(ResourceDimension::Dim dim) {
-    switch (dim)
-    {
+    switch (dim) {
     case ResourceDimension::Buffer:
         return D3D12_RESOURCE_DIMENSION_BUFFER;
     case ResourceDimension::Texture1D:
@@ -62,6 +60,189 @@ ConvertResourceFlags(ResourceFlags::Flags flags) {
     return value;
 }
 
+constexpr D3D12_BLEND
+ConvertBlend(Blend::Type blend) {
+    switch (blend) {
+    case Blend::Zero:
+        return D3D12_BLEND_ZERO;
+    case Blend::One:
+        return D3D12_BLEND_ONE;
+    case Blend::SrcColor:
+        return D3D12_BLEND_SRC_COLOR;
+    case Blend::InvSrcColor:
+        return D3D12_BLEND_INV_SRC_COLOR;
+    case Blend::SrcAlpha:
+        return D3D12_BLEND_SRC_ALPHA;
+    case Blend::InvSrcAlpha:
+        return D3D12_BLEND_INV_SRC_ALPHA;
+    case Blend::DstColor:
+        return D3D12_BLEND_DEST_COLOR;
+    case Blend::InvDstColor:
+        return D3D12_BLEND_INV_DEST_COLOR;
+    case Blend::DstAlpha:
+        return D3D12_BLEND_DEST_ALPHA;
+    case Blend::InvDstAlpha:
+        return D3D12_BLEND_INV_DEST_ALPHA;
+    case Blend::BlendFactor:
+        return D3D12_BLEND_BLEND_FACTOR;
+    default:
+        return D3D12_BLEND_ZERO;
+    }
+}
+
+constexpr D3D12_BLEND_OP
+ConvertBlendOp(BlendOp::Op op) {
+    switch (op) {
+    case BlendOp::Add:
+        return D3D12_BLEND_OP_ADD;
+    case BlendOp::Sub:
+        return D3D12_BLEND_OP_SUBTRACT;
+    case BlendOp::RevSub:
+        return D3D12_BLEND_OP_REV_SUBTRACT;
+    case BlendOp::Min:
+        return D3D12_BLEND_OP_MIN;
+    case BlendOp::Max:
+        return D3D12_BLEND_OP_MAX;
+    default:
+        return D3D12_BLEND_OP_ADD;
+    }
+}
+
+constexpr D3D12_LOGIC_OP
+ConvertLogicOp(LogicOp::Op op) {
+    switch (op) {
+    case LogicOp::Clear:
+        return D3D12_LOGIC_OP_CLEAR;
+    case LogicOp::Set:
+        return D3D12_LOGIC_OP_SET;
+    case LogicOp::Copy:
+        return D3D12_LOGIC_OP_COPY;
+    case LogicOp::CopyInv:
+        return D3D12_LOGIC_OP_COPY_INVERTED;
+    case LogicOp::Noop:
+        return D3D12_LOGIC_OP_NOOP;
+    case LogicOp::Inv:
+        return D3D12_LOGIC_OP_INVERT;
+    case LogicOp::And:
+        return D3D12_LOGIC_OP_AND;
+    case LogicOp::Nand:
+        return D3D12_LOGIC_OP_NAND;
+    case LogicOp::Or:
+        return D3D12_LOGIC_OP_OR;
+    case LogicOp::Nor:
+        return D3D12_LOGIC_OP_NOR;
+    case LogicOp::Xor:
+        return D3D12_LOGIC_OP_XOR;
+    case LogicOp::Equiv:
+        return D3D12_LOGIC_OP_EQUIV;
+    case LogicOp::AndRev:
+        return D3D12_LOGIC_OP_AND_REVERSE;
+    case LogicOp::AndInv:
+        return D3D12_LOGIC_OP_AND_INVERTED;
+    case LogicOp::OrRev:
+        return D3D12_LOGIC_OP_OR_REVERSE;
+    case LogicOp::OrInv:
+        return D3D12_LOGIC_OP_OR_INVERTED;
+    default:
+        return D3D12_LOGIC_OP_CLEAR;
+    }
+}
+
+constexpr D3D12_FILL_MODE
+ConvertFillMode(FillMode::Mode mode) {
+    switch (mode) {
+    case FillMode::Wireframe:
+        return D3D12_FILL_MODE_WIREFRAME;
+    case FillMode::Solid:
+        return D3D12_FILL_MODE_SOLID;
+    default:
+        return D3D12_FILL_MODE_SOLID;
+    }
+}
+
+constexpr D3D12_CULL_MODE
+ConvertCullMode(CullMode::Mode mode) {
+    switch (mode)
+    {
+    case CullMode::None:
+        return D3D12_CULL_MODE_NONE;
+    case CullMode::Front:
+        return D3D12_CULL_MODE_FRONT;
+    case CullMode::Back:
+        return D3D12_CULL_MODE_BACK;
+    default:
+        return D3D12_CULL_MODE_FRONT;
+    }
+}
+
+constexpr D3D12_COMPARISON_FUNC
+ConvertComparisonFunc(ComparisonFunc::Func func) {
+    switch (func) {
+    case ComparisonFunc::None:
+        return D3D12_COMPARISON_FUNC_NONE;
+    case ComparisonFunc::Never:
+        return D3D12_COMPARISON_FUNC_NEVER;
+    case ComparisonFunc::Less:
+        return D3D12_COMPARISON_FUNC_LESS;
+    case ComparisonFunc::Equal:
+        return D3D12_COMPARISON_FUNC_EQUAL;
+    case ComparisonFunc::LessEqual:
+        return D3D12_COMPARISON_FUNC_LESS_EQUAL;
+    case ComparisonFunc::Greater:
+        return D3D12_COMPARISON_FUNC_GREATER;
+    case ComparisonFunc::NotEqual:
+        return D3D12_COMPARISON_FUNC_NOT_EQUAL;
+    case ComparisonFunc::GreaterEqual:
+        return D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+    case ComparisonFunc::Always:
+        return D3D12_COMPARISON_FUNC_ALWAYS;
+    default:
+        return D3D12_COMPARISON_FUNC_NONE;
+    }
+}
+
+constexpr D3D12_STENCIL_OP
+ConvertStencilOp(StencilOp::Op op) {
+    switch (op) {
+    case StencilOp::Keep:
+        return D3D12_STENCIL_OP_KEEP;
+    case StencilOp::Zero:
+        return D3D12_STENCIL_OP_ZERO;
+    case StencilOp::Replace:
+        return D3D12_STENCIL_OP_REPLACE;
+    case StencilOp::IncrSat:
+        return D3D12_STENCIL_OP_INCR_SAT;
+    case StencilOp::DecrSat:
+        return D3D12_STENCIL_OP_DECR_SAT;
+    case StencilOp::Inv:
+        return D3D12_STENCIL_OP_INVERT;
+    case StencilOp::Incr:
+        return D3D12_STENCIL_OP_INCR;
+    case StencilOp::Decr:
+        return D3D12_STENCIL_OP_DECR;
+    default:
+        return D3D12_STENCIL_OP_KEEP;
+    }
+}
+
+constexpr D3D12_PRIMITIVE_TOPOLOGY_TYPE
+ConvertTopologyType(PrimitiveTopologyType::Type type) {
+    switch (type)
+    {
+    case PrimitiveTopologyType::Unknown:
+        return D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED;
+    case PrimitiveTopologyType::Point:
+        return D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+    case PrimitiveTopologyType::Line:
+        return D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
+    case PrimitiveTopologyType::Triangle:
+        return D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+    case PrimitiveTopologyType::Patch:
+        return D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
+    default:
+        return D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED;
+    }
+}
 
 constexpr static D3D12_RESOURCE_STATES
 ConvertResourceStates(ResourceState::State state)
@@ -86,7 +267,7 @@ ConvertResourceStates(ResourceState::State state)
 
 constexpr static D3D12_SHADER_VISIBILITY
 ConvertVisibility(ShaderVisibility::Vis vis) {
-    switch (vis)     {
+    switch (vis) {
     case ShaderType::Vertex:
         return D3D12_SHADER_VISIBILITY_VERTEX;
     case ShaderType::Pixel:
@@ -131,32 +312,171 @@ ToWideString(std::string str) {
     return { str.begin(), str.end() };
 }
 
+static u64
+HashShaderBytecode(const D3D12_SHADER_BYTECODE& bc, u64 hash) {
+    using namespace Shared;
+
+    hash = HashBytes(&bc.BytecodeLength, sizeof(bc.BytecodeLength), hash);
+    if (bc.pShaderBytecode && bc.BytecodeLength > 0) {
+        hash = HashBytes(bc.pShaderBytecode, bc.BytecodeLength, hash);
+    }
+    return hash;
+}
+
+u64
+HashGraphicsPSODesc(const D3D12_GRAPHICS_PIPELINE_STATE_DESC& desc) {
+    u64 hash{ 1469598103934665603ull };
+
+    using namespace Shared;
+
+    hash = HashBytes(&desc.pRootSignature, sizeof(desc.pRootSignature), hash);
+    hash = HashShaderBytecode(desc.VS, hash);
+    hash = HashShaderBytecode(desc.PS, hash);
+    hash = HashShaderBytecode(desc.DS, hash);
+    hash = HashShaderBytecode(desc.HS, hash);
+    hash = HashShaderBytecode(desc.GS, hash);
+    hash = HashStruct(desc.StreamOutput, hash);
+    hash = HashStruct(desc.BlendState, hash);
+    hash = HashStruct(desc.SampleMask, hash);
+    hash = HashStruct(desc.RasterizerState, hash);
+    hash = HashStruct(desc.DepthStencilState, hash);
+    hash = HashBytes(&desc.InputLayout.NumElements, sizeof(UINT), hash);
+    for (UINT i = 0; i < desc.InputLayout.NumElements; ++i)
+    {
+        const D3D12_INPUT_ELEMENT_DESC& el = desc.InputLayout.pInputElementDescs[i];
+
+        hash = HashBytes(el.SemanticName, strlen(el.SemanticName), hash);
+        hash = HashStruct(el.SemanticIndex, hash);
+        hash = HashStruct(el.Format, hash);
+        hash = HashStruct(el.InputSlot, hash);
+        hash = HashStruct(el.AlignedByteOffset, hash);
+        hash = HashStruct(el.InputSlotClass, hash);
+        hash = HashStruct(el.InstanceDataStepRate, hash);
+    }
+
+    hash = HashStruct(desc.IBStripCutValue, hash);
+    hash = HashStruct(desc.PrimitiveTopologyType, hash);
+    hash = HashStruct(desc.NumRenderTargets, hash);
+    hash = HashBytes(desc.RTVFormats, sizeof(desc.RTVFormats), hash);
+    hash = HashStruct(desc.DSVFormat, hash);
+    hash = HashStruct(desc.SampleDesc, hash);
+    hash = HashStruct(desc.NodeMask, hash);
+    hash = HashBytes(&desc.CachedPSO.CachedBlobSizeInBytes,
+        sizeof(desc.CachedPSO.CachedBlobSizeInBytes), hash);
+
+    hash = HashStruct(desc.Flags, hash);
+
+    return hash;
+}
+
+u64
+HashComputePSODesc(const D3D12_COMPUTE_PIPELINE_STATE_DESC& desc) {
+    u64 hash{ 1469598103934665603ull };
+
+    using namespace Shared;
+
+    hash = HashBytes(&desc.pRootSignature, sizeof(desc.pRootSignature), hash);
+    hash = HashShaderBytecode(desc.CS, hash);
+    hash = HashStruct(desc.NodeMask, hash);
+    hash = HashBytes(&desc.CachedPSO.CachedBlobSizeInBytes,
+        sizeof(desc.CachedPSO.CachedBlobSizeInBytes), hash);
+
+    hash = HashStruct(desc.Flags, hash);
+
+    return hash;
+}
+
 namespace Cmd {
 struct CommandListData {
     ID3D12GraphicsCommandList10*    List{};
+    CRHIDevice_DX12*                Device{};
 
     bool                            GraphicsLayout{};
+    RHIPipelineLayout               CurrentLayout{ Id::InvalidId };
+    RHIPipeline                     CurrentPipeline{ Id::InvalidId };
 
-    u32                             CounterDraw;
-    u32                             CounterDrawInstanced;
-    u32                             CounterDrawIndexed;
-    u32                             CounterDrawIndexedInstanced;
+    u32                             CounterDraw{};
+    u32                             CounterDrawInstanced{};
+    u32                             CounterDrawIndexed{};
+    u32                             CounterDrawIndexedInstanced{};
 };
 
 typedef void(*CommandFunc)(CommandListData&, const void*);
 
 void
+CopyResource(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdCopyResourceInfo& info{ *(const RHICommandBuilder::CmdCopyResourceInfo*)data };
+    ID3D12Resource* const src{ cmdData.Device->ResolveResource(info.Src) };
+    ID3D12Resource* const dst{ cmdData.Device->ResolveResource(info.Dst) };
+    cmdData.List->CopyResource(dst, src);
+}
+
+void
 SetGraphicsLayout(CommandListData& cmdData, const void* data) {
     const RHICommandBuilder::CmdSetGraphicsLayoutInfo& info{ *(const RHICommandBuilder::CmdSetGraphicsLayoutInfo*)data };
-    cmdData.List->SetGraphicsRootSignature((ID3D12RootSignature*)info.Layout->GetNative());
-    cmdData.GraphicsLayout = true;
+    if (cmdData.CurrentLayout != info.Layout) {
+        ID3D12RootSignature* root_sig{ cmdData.Device->ResolveLayout(info.Layout) };
+        cmdData.List->SetGraphicsRootSignature(root_sig);
+        cmdData.GraphicsLayout = true;
+        cmdData.CurrentLayout = info.Layout;
+    }
 }
 
 void
 SetComputeLayout(CommandListData& cmdData, const void* data) {
     const RHICommandBuilder::CmdSetGraphicsLayoutInfo& info{ *(const RHICommandBuilder::CmdSetGraphicsLayoutInfo*)data };
-    cmdData.List->SetComputeRootSignature((ID3D12RootSignature*)info.Layout->GetNative());
-    cmdData.GraphicsLayout = false;
+    if (cmdData.CurrentLayout != info.Layout) {
+        ID3D12RootSignature* root_sig{ cmdData.Device->ResolveLayout(info.Layout) };
+        cmdData.List->SetComputeRootSignature(root_sig);
+        cmdData.GraphicsLayout = false;
+        cmdData.CurrentLayout = info.Layout;
+    }
+}
+
+void
+SetPipeline(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdSetPipelineInfo& info{ *(const RHICommandBuilder::CmdSetPipelineInfo*)data };
+    if (cmdData.CurrentPipeline != info.Pso) {
+        ID3D12PipelineState* pso{ cmdData.Device->ResolvePso(info.Pso) };
+        cmdData.List->SetPipelineState(pso);
+        cmdData.CurrentPipeline = info.Pso;
+    }
+}
+
+void
+SetPrimitiveTopology(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdSetPrimitiveTopologyInfo& info{ *(const RHICommandBuilder::CmdSetPrimitiveTopologyInfo*)data };
+    cmdData.List->IASetPrimitiveTopology(Shared::ConvertTopology(info.Topology));
+}
+
+void
+SetViewport(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdSetViewportsInfo& info{ *(const RHICommandBuilder::CmdSetViewportsInfo*)data };
+    static D3D12_VIEWPORT vps[RHI_MAX_TARGET_COUNT]{};
+    for (u32 i{ 0 }; i < info.Count; ++i) {
+        vps[i].TopLeftX = info.Views[i].TopLeftX;
+        vps[i].TopLeftY = info.Views[i].TopLeftY;
+        vps[i].Width = info.Views[i].Width;
+        vps[i].Height = info.Views[i].Height;
+        vps[i].MinDepth = info.Views[i].MinDepth;
+        vps[i].MaxDepth = info.Views[i].MaxDepth;
+    }
+
+    cmdData.List->RSSetViewports(info.Count, &vps[0]);
+}
+
+void
+SetScissor(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdSetScissorsInfo& info{ *(const RHICommandBuilder::CmdSetScissorsInfo*)data };
+    static D3D12_RECT rcs[RHI_MAX_TARGET_COUNT]{};
+    for (u32 i{ 0 }; i < info.Count; ++i) {
+        rcs[i].left = info.Rects[i].Left;
+        rcs[i].top = info.Rects[i].Top;
+        rcs[i].right = info.Rects[i].Right;
+        rcs[i].bottom = info.Rects[i].Bottom;
+    }
+
+    cmdData.List->RSSetScissorRects(info.Count, &rcs[0]);
 }
 
 void
@@ -188,9 +508,13 @@ DrawIndexedInstanced(CommandListData& cmdData, const void* data) {
 }
 
 constexpr static CommandFunc DispatchTable[RHICommandBuilder::CommandId::Count]{
-    nullptr,
+    CopyResource,
     SetGraphicsLayout,
     SetComputeLayout,
+    SetPipeline,
+    SetPrimitiveTopology,
+    SetViewport,
+    SetScissor,
     Draw,
     DrawInstanced,
     DrawIndexed,
@@ -576,7 +900,11 @@ CRHIDevice_DX12::CRHIDevice_DX12(
         return;
     }
 
-    m_D3D12Dll = LoadLibraryExA("d3d12.dll", 0, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    m_D3D12Dll = LoadLibraryA("d3d12.dll");
+    if (!m_D3D12Dll) {
+        m_D3D12Dll = GetModuleHandleA("d3d12.dll");
+    }
+
     if (!m_D3D12Dll) {
         LOG_FATAL("Failed to load d3d12.dll!");
         return;
@@ -602,19 +930,30 @@ CRHIDevice_DX12::CRHIDevice_DX12(
 
     IUnknown* const dxgi_adapter{ (IUnknown* const)adapter->GetNative() };
 
-    m_FeatureLevel = _GetMaximumFL(dxgi_adapter);
-    if (!m_FeatureLevel) {
-        LOG_FATAL("D3D12 Not supported!");
-        return;
-    }
+    constexpr static D3D_FEATURE_LEVEL levels[]{
+        D3D_FEATURE_LEVEL_12_2,
+        D3D_FEATURE_LEVEL_12_1,
+        D3D_FEATURE_LEVEL_12_0,
+        D3D_FEATURE_LEVEL_11_1,
+        D3D_FEATURE_LEVEL_11_0,
+    };
 
     HRESULT hr{ S_OK };
-    hr = m_D3D12CreateDevice(
-        dxgi_adapter,
-        m_FeatureLevel,
-        IID_PPV_ARGS(&m_Device));
+
+    for (auto& level : levels) {
+        hr = m_D3D12CreateDevice(
+            dxgi_adapter,
+            level,
+            IID_PPV_ARGS(&m_Device));
+        if (SUCCEEDED(hr)) {
+            m_FeatureLevel = level;
+            break;
+        }
+    }
+
     if (FAILED(hr)) {
-        LOG_FATAL("D3D12 Not supported!");
+        LOG_FATAL("Failed to create D3D12 device!");
+        LOG_HR(hr);
         return;
     }
 
@@ -684,7 +1023,10 @@ CRHIDevice_DX12::Release() {
 
 Result::Code
 CRHIDevice_DX12::CreateResource(const ResourceInitInfo& info,
-    IRHIResource** resource) {
+    RHIResource* resource) {
+    if (!resource) {
+        return Result::ENullptr;
+    }
 
     D3D12_RESOURCE_DESC desc{};
     desc.Dimension = ConvertResourceDimension(info.Dimension);
@@ -706,170 +1048,67 @@ CRHIDevice_DX12::CreateResource(const ResourceInitInfo& info,
         )
     };
 
+    DenseResource dense{};
+
     switch (info.Dimension)
     {
     case ResourceDimension::Buffer: {
-        HeapAllocInfo heap_info{ m_BufferHeaps.Allocate(alloc_info.SizeInBytes) };
-        if (!(heap_info.Heap && heap_info.Size == alloc_info.SizeInBytes)) {
+        dense.Info = { m_BufferHeaps.Allocate(alloc_info.SizeInBytes) };
+        if (!(dense.Info.Heap && dense.Info.Size == alloc_info.SizeInBytes)) {
             return Result::ENomemory;
         }
 
-        ID3D12Resource* res{ nullptr };
         HRESULT hr{ S_OK };
         hr = m_Device->CreatePlacedResource(
-            heap_info.Heap,
-            heap_info.Offset,
+            dense.Info.Heap,
+            dense.Info.Offset,
             &desc,
             D3D12_RESOURCE_STATE_COMMON,
             nullptr,
-            IID_PPV_ARGS(&res));
+            IID_PPV_ARGS(&dense.Resource));
         if (FAILED(hr)) {
             return Result::ECreateResource;
         }
-
-        CRHIResource_DX12* temp{ new CRHIResource_DX12(res, &m_BufferHeaps, heap_info) };
-        if (!temp) {
-            return Result::ENomemory;
-        }
-
-        *resource = temp;
     } break;
     default:
         break;
     }
+
+    if (!dense.Resource) {
+        return Result::ECreateResource;
+    }
+
+    u32 sparse_index{};
+    if (!m_FreeSparseResources.Empty()) {
+        sparse_index = m_FreeSparseResources.Back();
+        m_FreeSparseResources.PopBack();
+    }
+    else {
+        sparse_index = m_SparseResources.Size();
+        m_SparseResources.PushBack({});
+    }
+
+    dense.SparseIndex = sparse_index;
+
+    const u32 dense_index{ m_DenseResources.Size() };
+    m_DenseResources.EmplaceBack(dense);
+
+    auto& slot{ m_SparseResources[sparse_index] };
+    slot.DenseIndex = dense_index;
+
+    *resource = Id::MakeHandle(sparse_index, slot.Generation);
 
     return Result::Ok;
 }
 
 Result::Code
 CRHIDevice_DX12::CreatePipelineLayout(const PipelineLayoutInitInfo& info,
-    IRHIPipelineLayout** outHandle) {
-    CRHIPipelineLayout_DX12* temp{ new CRHIPipelineLayout_DX12(this, info) };
-    if (!temp) {
-        return Result::ENomemory;
+    RHIPipelineLayout* outHandle) {
+    if (!outHandle) {
+        return Result::ENullptr;
     }
 
-    if (!temp->GetNative()) {
-        delete temp;
-        return Result::ECreateRHIObject;
-    }
-
-    *outHandle = temp;
-
-    return Result::Ok;
-}
-
-Result::Code
-CRHIDevice_DX12::CreateSurface(const SurfaceInitInfo& info,
-    IRHISurface** surface) {
-    CRHISurface_DX12* temp{ new CRHISurface_DX12(this, m_Factory, info) };
-    if (!temp) {
-        return Result::ENomemory;
-    }
-
-    if (!(temp->GetNative() && temp->GetNativeBuffer(0))) {
-        delete temp;
-        return Result::ECreateRHIObject;
-    }
-
-    *surface = temp;
-
-    return Result::Ok;
-}
-
-Result::Code
-CRHIDevice_DX12::CreateFrameGraph(const RHIGraphBuilder& builder,
-    u32 flags,
-    IRHIFrameGraph** outHandle) {
-    CRHIFrameGraph_DX12* temp{ new CRHIFrameGraph_DX12() };
-    if (!temp) {
-        return Result::ENomemory;
-    }
-
-    Result::Code res{ Result::Ok };
-    res = temp->Initialize(this, flags, builder);
-
-    if (Result::Fail(res)) {
-        delete temp;
-        return res;
-    }
-
-    *outHandle = temp;
-
-    return Result::Ok;
-}
-
-void
-CRHIDevice_DX12::GetFeatures(
-    DeviceFeatures* features) {
-    if (!features)
-        return;
-
-    *features = m_Features;
-}
-
-void* const
-CRHIDevice_DX12::GetNative() const {
-    return m_Device;
-}
-
-D3D_FEATURE_LEVEL
-CRHIDevice_DX12::_GetMaximumFL(IUnknown* const adapter) const
-{
-    ComPtr<ID3D12Device> device{};
-    if (FAILED(m_D3D12CreateDevice(adapter,
-        D3D_FEATURE_LEVEL_11_0,
-        IID_PPV_ARGS(&device))))
-        return (D3D_FEATURE_LEVEL)0;
-
-    const D3D_FEATURE_LEVEL levels[]{
-        D3D_FEATURE_LEVEL_11_0,
-        D3D_FEATURE_LEVEL_11_1,
-        D3D_FEATURE_LEVEL_12_0,
-        D3D_FEATURE_LEVEL_12_1,
-        D3D_FEATURE_LEVEL_12_2,
-    };
-
-    D3D12_FEATURE_DATA_FEATURE_LEVELS data{};
-    data.NumFeatureLevels = _countof(levels);
-    data.pFeatureLevelsRequested = &levels[0];
-
-    device->CheckFeatureSupport(
-        D3D12_FEATURE_FEATURE_LEVELS,
-        &data,
-        sizeof(D3D12_FEATURE_DATA_FEATURE_LEVELS));
-
-    return data.MaxSupportedFeatureLevel;
-}
-
-void
-CRHIResource_DX12::Release() {
-    SafeRelease(m_Resource);
-
-    if (m_IsBuffer) {
-        if (!Buffer.m_BufferHeap) {
-            LOG_ERROR("Released resource should ALWAYS have a heap!");
-            return;
-        }
-
-        Buffer.m_BufferHeap->Free(Buffer.m_BufferAlloc);
-    }
-
-    delete this;
-}
-
-void* const
-CRHIResource_DX12::GetNative() const {
-    return m_Resource;
-}
-
-CRHIPipelineLayout_DX12::CRHIPipelineLayout_DX12(
-    CRHIDevice_DX12* const device,
-    const PipelineLayoutInitInfo& info)
-    : m_RootSig() {
-    if (!(device && device->GetNative())) {
-        return;
-    }
+    *outHandle = Id::InvalidId;
 
     std::vector<D3D12_ROOT_PARAMETER> rootParams;
     std::vector<D3D12_DESCRIPTOR_RANGE> ranges;
@@ -962,7 +1201,7 @@ CRHIPipelineLayout_DX12::CRHIPipelineLayout_DX12(
     ComPtr<ID3DBlob> error;
 
     HRESULT hr{ S_OK };
-    hr = device->D3D12SerializeVersionedRootSignature(
+    hr = m_SerializeRootSig(
         &desc,
         &blob,
         &error);
@@ -971,27 +1210,454 @@ CRHIPipelineLayout_DX12::CRHIPipelineLayout_DX12(
             LOG_ERROR("RootSig Error: %s", (char*)error->GetBufferPointer());
         }
 
-        return;
+        return Result::ECreateRHIObject;
     }
 
-    ID3D12Device14* const d3d12{ (ID3D12Device14* const)device->GetNative() };
-
-    hr = d3d12->CreateRootSignature(
+    ID3D12RootSignature* root_sig{ nullptr };
+    hr = m_Device->CreateRootSignature(
         0,
         blob->GetBufferPointer(),
         blob->GetBufferSize(),
-        IID_PPV_ARGS(&m_RootSig)
+        IID_PPV_ARGS(&root_sig)
     );
+
+    if (FAILED(hr)) {
+        return Result::ECreateRHIObject;
+    }
+
+    u32 index{};
+    if (m_FreeLayouts.Size()) {
+        index = m_FreeLayouts.Back();
+        m_FreeLayouts.PopBack();
+    }
+    else {
+        index = m_PipelineLayouts.Size();
+        m_PipelineLayouts.PushBack({});
+    }
+
+    m_PipelineLayouts[index].RootSig = root_sig;
+    *outHandle = Id::MakeHandle(index, m_PipelineLayouts[index].Generation);
+
+    return Result::Ok;
+}
+
+Result::Code
+CRHIDevice_DX12::CreateComputePipeline(const ComputePipelineInitInfo& info,
+    RHIPipeline* outHandle) {
+    if (!outHandle) {
+        return Result::ENullptr;
+    }
+
+    *outHandle = Id::InvalidId;
+
+    ID3D12RootSignature* const root_sig{ ResolveLayout(info.Layout) };
+    if (!(root_sig && info.CS.Blob && info.CS.Size)) {
+        return Result::EInvalidarg;
+    }
+
+    D3D12_COMPUTE_PIPELINE_STATE_DESC desc{};
+    desc.pRootSignature = root_sig;
+    desc.CS.pShaderBytecode = info.CS.Blob;
+    desc.CS.BytecodeLength = info.CS.Size;
+    desc.NodeMask = 0;
+    desc.CachedPSO.pCachedBlob = nullptr;
+    desc.CachedPSO.CachedBlobSizeInBytes = 0;
+    desc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+
+    const u64 hash{ HashComputePSODesc(desc) };
+    const auto it{ m_PsoMap.find(hash) };
+    if (it == m_PsoMap.end()) {
+        ID3D12PipelineState* pso{ nullptr };
+
+        HRESULT hr{ S_OK };
+        hr = m_Device->CreateComputePipelineState(&desc,
+            IID_PPV_ARGS(&pso));
+        if (FAILED(hr)) {
+            return Result::ECreateRHIObject;
+        }
+
+        u32 index{};
+        if (m_FreePsos.Size()) {
+            index = m_FreePsos.Back();
+            m_FreePsos.PopBack();
+        }
+        else {
+            index = m_Pipelines.Size();
+            m_Pipelines.PushBack({});
+        }
+
+        m_Pipelines[index].Pso = pso;
+        m_Pipelines[index].RefCount = 1;
+        m_Pipelines[index].Hash = hash;
+
+        *outHandle = Id::MakeHandle(index, m_Pipelines[index].Generation);
+
+        m_PsoMap[hash] = index;
+    }
+    else {
+        const u32 index{ it->second };
+        m_Pipelines[index].RefCount++;
+        *outHandle = Id::MakeHandle(index, m_Pipelines[index].Generation);
+    }
+
+    return Result::Ok;
+}
+
+Result::Code
+CRHIDevice_DX12::CreateGraphicsPipeline(
+    const GraphicsPipelineInitInfo& info,
+    RHIPipeline* outHandle) {
+    if (!outHandle) {
+        return Result::ENullptr;
+    }
+
+    *outHandle = Id::InvalidId;
+
+    ID3D12RootSignature* const root_sig{ ResolveLayout(info.Layout) };
+    if (!root_sig) {
+        return Result::EInvalidarg;
+    }
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC desc{};
+    desc.pRootSignature = root_sig;
+    desc.VS.pShaderBytecode = info.VS.Blob;
+    desc.VS.BytecodeLength = info.VS.Size;
+    desc.PS.pShaderBytecode = info.PS.Blob;
+    desc.PS.BytecodeLength = info.PS.Size;
+    desc.DS.pShaderBytecode = info.DS.Blob;
+    desc.DS.BytecodeLength = info.DS.Size;
+    desc.HS.pShaderBytecode = info.HS.Blob;
+    desc.HS.BytecodeLength = info.HS.Size;
+    desc.GS.pShaderBytecode = info.GS.Blob;
+    desc.GS.BytecodeLength = info.GS.Size;
+
+    desc.StreamOutput = {};
+
+    desc.BlendState.AlphaToCoverageEnable = info.Blend.AlphaToCoverageEnable;
+    desc.BlendState.IndependentBlendEnable = info.Blend.IndependentBlendEnable;
+
+    for (u32 i{ 0 }; i < RHI_MAX_TARGET_COUNT; ++i) {
+        const TargetBlendInitInfo& tgt{ info.Blend.Targets[i] };
+
+        desc.BlendState.RenderTarget[i].BlendEnable = tgt.BlendEnable;
+        desc.BlendState.RenderTarget[i].LogicOpEnable = tgt.LogicOp;
+        desc.BlendState.RenderTarget[i].SrcBlend = ConvertBlend(tgt.SrcBlend);
+        desc.BlendState.RenderTarget[i].DestBlend = ConvertBlend(tgt.DstBlend);
+        desc.BlendState.RenderTarget[i].BlendOp = ConvertBlendOp(tgt.BlendOp);
+        desc.BlendState.RenderTarget[i].SrcBlendAlpha = ConvertBlend(tgt.SrcBlendAlpha);
+        desc.BlendState.RenderTarget[i].DestBlendAlpha = ConvertBlend(tgt.DstBlendAlpha);
+        desc.BlendState.RenderTarget[i].BlendOpAlpha = ConvertBlendOp(tgt.BlendOpAlpha);
+        desc.BlendState.RenderTarget[i].LogicOp = ConvertLogicOp(tgt.LogicOp);
+        desc.BlendState.RenderTarget[i].RenderTargetWriteMask = tgt.TargetMask;
+    }
+
+    desc.SampleMask = info.SampleMask;
+
+    desc.RasterizerState.FillMode = ConvertFillMode(info.Rasterizer.Fill);
+    desc.RasterizerState.CullMode = ConvertCullMode(info.Rasterizer.Cull);
+    desc.RasterizerState.FrontCounterClockwise = info.Rasterizer.FrontCounterClockwise;
+    desc.RasterizerState.DepthBias = info.Rasterizer.DepthBias;
+    desc.RasterizerState.DepthBiasClamp = info.Rasterizer.DepthBiasClamp;
+    desc.RasterizerState.SlopeScaledDepthBias = info.Rasterizer.SlopeScaledDepthBias;
+    desc.RasterizerState.DepthClipEnable = info.Rasterizer.DepthClipEnable;
+    desc.RasterizerState.MultisampleEnable = info.Rasterizer.MultisampleEnable;
+    desc.RasterizerState.AntialiasedLineEnable = info.Rasterizer.AntialiasedLineEnable;
+    desc.RasterizerState.ForcedSampleCount = info.Rasterizer.ForcedSampleCount;
+    desc.RasterizerState.ConservativeRaster =
+        info.Rasterizer.ConservativeRaster
+        ? D3D12_CONSERVATIVE_RASTERIZATION_MODE_ON
+        : D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+
+    desc.DepthStencilState.DepthEnable = info.DepthStencil.DepthEnable;
+    desc.DepthStencilState.DepthWriteMask = info.DepthStencil.DepthWriteAll ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
+    desc.DepthStencilState.DepthFunc = ConvertComparisonFunc(info.DepthStencil.DepthFunc);
+    desc.DepthStencilState.StencilEnable = info.DepthStencil.StencilEnable;
+    desc.DepthStencilState.StencilReadMask = info.DepthStencil.StencilReadMask;
+    desc.DepthStencilState.StencilWriteMask = info.DepthStencil.StencilWriteMask;
+    desc.DepthStencilState.FrontFace.StencilFailOp = ConvertStencilOp(info.DepthStencil.FrontFace.StencilFailOp);
+    desc.DepthStencilState.FrontFace.StencilDepthFailOp = ConvertStencilOp(info.DepthStencil.FrontFace.StencilDepthFailOp);
+    desc.DepthStencilState.FrontFace.StencilPassOp = ConvertStencilOp(info.DepthStencil.FrontFace.StencilPassOp);
+    desc.DepthStencilState.FrontFace.StencilFunc = ConvertComparisonFunc(info.DepthStencil.FrontFace.StencilFunc);
+    desc.DepthStencilState.BackFace.StencilFailOp = ConvertStencilOp(info.DepthStencil.BackFace.StencilFailOp);
+    desc.DepthStencilState.BackFace.StencilDepthFailOp = ConvertStencilOp(info.DepthStencil.BackFace.StencilDepthFailOp);
+    desc.DepthStencilState.BackFace.StencilPassOp = ConvertStencilOp(info.DepthStencil.BackFace.StencilPassOp);
+    desc.DepthStencilState.BackFace.StencilFunc = ConvertComparisonFunc(info.DepthStencil.BackFace.StencilFunc);
+
+    Vector<D3D12_INPUT_ELEMENT_DESC> input_elements{ info.InputAssembler.NumElements };
+    for (u32 i{ 0 }; i < info.InputAssembler.NumElements; ++i) {
+        const PipelineInputElementInitInfo& input{ info.InputAssembler.Elements[i] };
+
+        input_elements[i].SemanticName = input.Name;
+        input_elements[i].SemanticIndex = input.Index;
+        input_elements[i].Format = Shared::ConvertFormat(input.Format);
+        input_elements[i].InputSlot = input.InputSlot;
+        input_elements[i].AlignedByteOffset = input.AlignedOffset;
+        input_elements[i].InputSlotClass = input.Rate == InputRate::PerVertex
+            ? D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA
+            : D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA;
+        input_elements[i].InstanceDataStepRate = input.InstanceStepRate;
+    }
+
+    desc.InputLayout.pInputElementDescs = input_elements.Data();
+    desc.InputLayout.NumElements = input_elements.Size();
+
+    desc.IBStripCutValue = D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
+    desc.PrimitiveTopologyType = ConvertTopologyType(info.PrimitiveTopology);
+
+    desc.NumRenderTargets = info.NumTargets;
+
+    for (u32 i{ 0 }; i < RHI_MAX_TARGET_COUNT; ++i) {
+        desc.RTVFormats[i] = Shared::ConvertFormat(info.TargetFormats[i]);
+    }
+
+    desc.DSVFormat = Shared::ConvertFormat(info.DepthFormat);
+    desc.SampleDesc = { 1, 0 };
+    desc.NodeMask = 0;
+    desc.CachedPSO.pCachedBlob = nullptr;
+    desc.CachedPSO.CachedBlobSizeInBytes = 0;
+    desc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+
+    const u64 hash{ HashGraphicsPSODesc(desc) };
+    const auto it{ m_PsoMap.find(hash) };
+    if (it == m_PsoMap.end()) {
+        ID3D12PipelineState* pso{ nullptr };
+        HRESULT hr{ S_OK };
+        hr = m_Device->CreateGraphicsPipelineState(&desc,
+            IID_PPV_ARGS(&pso));
+        if (FAILED(hr)) {
+            return Result::ECreateRHIObject;
+        }
+
+        u32 index{};
+        if (m_FreePsos.Size()) {
+            index = m_FreePsos.Back();
+            m_FreePsos.PopBack();
+        }
+        else {
+            index = m_Pipelines.Size();
+            m_Pipelines.PushBack({});
+        }
+
+        m_Pipelines[index].Pso = pso;
+        m_Pipelines[index].RefCount = 1;
+        m_Pipelines[index].Hash = hash;
+
+        *outHandle = Id::MakeHandle(index, m_Pipelines[index].Generation);
+        m_PsoMap[hash] = index;
+    }
+    else {
+        const u32 index{ it->second };
+        m_Pipelines[index].RefCount++;
+        *outHandle = Id::MakeHandle(index, m_Pipelines[index].Generation);
+    }
+
+    return Result::Ok;
+}
+
+Result::Code
+CRHIDevice_DX12::CreateSurface(const SurfaceInitInfo& info,
+    IRHISurface** surface) {
+    CRHISurface_DX12* temp{ new CRHISurface_DX12(this, m_Factory, info) };
+    if (!temp) {
+        return Result::ENomemory;
+    }
+
+    if (!(temp->GetNative() && temp->GetNativeBuffer(0))) {
+        delete temp;
+        return Result::ECreateRHIObject;
+    }
+
+    *surface = temp;
+
+    return Result::Ok;
+}
+
+Result::Code
+CRHIDevice_DX12::CreateFrameGraph(const RHIGraphBuilder& builder,
+    u32 flags,
+    IRHIFrameGraph** outHandle) {
+    CRHIFrameGraph_DX12* temp{ new CRHIFrameGraph_DX12() };
+    if (!temp) {
+        return Result::ENomemory;
+    }
+
+    Result::Code res{ Result::Ok };
+    res = temp->Initialize(this, flags, builder);
+
+    if (Result::Fail(res)) {
+        delete temp;
+        return res;
+    }
+
+    *outHandle = temp;
+
+    return Result::Ok;
 }
 
 void
-CRHIPipelineLayout_DX12::Release() {
-    SafeRelease(m_RootSig);
+CRHIDevice_DX12::DestroyResource(
+    RHIResource resource) {
+    if (!Id::IsValid(resource)) {
+        return;
+    }
+
+    u32 sparse_index{ Id::Index(resource) };
+    auto& slot{ m_SparseResources[sparse_index] };
+
+    if (slot.Generation != Id::Generation(resource)) {
+        return;
+    }
+
+    const u32 dense_index{ slot.DenseIndex };
+    const u32 last_dense{ m_DenseResources.Size() - 1 };
+    const u32 moved_sparse{ m_DenseResources[last_dense].SparseIndex };
+    DenseResource& removed{ m_DenseResources[dense_index] };
+
+    SafeRelease(removed.Resource);
+    m_BufferHeaps.Free(removed.Info);
+
+    std::swap(m_DenseResources[dense_index], m_DenseResources[last_dense]);
+
+    m_SparseResources[moved_sparse].DenseIndex = dense_index;
+
+    m_DenseResources.PopBack();
+
+    ++slot.Generation;
+    m_FreeSparseResources.PushBack(sparse_index);
+}
+
+void
+CRHIDevice_DX12::DestroyPipelineLayout(
+    RHIPipelineLayout layout) {
+    if (!Id::IsValid(layout)) {
+        return;
+    }
+
+    const u32 index{ Id::Index(layout) };
+    if (index >= m_PipelineLayouts.Size()) {
+        return;
+    }
+
+    SafeRelease(m_PipelineLayouts[index].RootSig);
+    ++m_PipelineLayouts[index].Generation;
+
+    m_FreeLayouts.PushBack(index);
+}
+
+void
+CRHIDevice_DX12::DestroyPipeline(
+    RHIPipeline pso) {
+    if (!Id::IsValid(pso)) {
+        return;
+    }
+
+    const u32 index{ Id::Index(pso) };
+    const u32 gen{ Id::Generation(pso) };
+    if (index >= m_Pipelines.Size()) {
+        return;
+    }
+
+    if (m_Pipelines[index].Generation != gen) {
+        return;
+    }
+
+    if (--m_Pipelines[index].RefCount > 0) {
+        return;
+    }
+    else {
+        auto& pipe = m_Pipelines[index];
+
+        m_PsoMap.erase(pipe.Hash);
+
+        SafeRelease(pipe.Pso);
+
+        pipe.Pso = nullptr;
+        pipe.RefCount = 0;
+        pipe.Hash = 0;
+
+        ++pipe.Generation;
+
+        m_FreePsos.PushBack(index);
+    }
+}
+
+void
+CRHIDevice_DX12::GetFeatures(
+    DeviceFeatures* features) {
+    if (!features)
+        return;
+
+    *features = m_Features;
 }
 
 void* const
-CRHIPipelineLayout_DX12::GetNative() const {
-    return m_RootSig;
+CRHIDevice_DX12::GetNative() const {
+    return m_Device;
+}
+
+ID3D12Resource* const
+CRHIDevice_DX12::ResolveResource(RHIResource handle) const {
+    u32 index{ Id::Index(handle) };
+    u32 gen{ Id::Index(handle) };
+
+    const auto& slot{ m_SparseResources[index] };
+    if (slot.Generation != gen)
+        return nullptr;
+
+    return m_DenseResources[slot.DenseIndex].Resource;
+}
+
+ID3D12RootSignature* const
+CRHIDevice_DX12::ResolveLayout(RHIPipelineLayout layout) const {
+    u32 index{ Id::Index(layout) };
+    u32 gen{ Id::Index(layout) };
+
+    const auto& data{ m_PipelineLayouts[index] };
+    if (data.Generation != gen)
+        return nullptr;
+
+    return data.RootSig;
+}
+
+ID3D12PipelineState* const
+CRHIDevice_DX12::ResolvePso(RHIPipeline pso) const {
+    u32 index{ Id::Index(pso) };
+    u32 gen{ Id::Index(pso) };
+
+    const auto& data{ m_Pipelines[index] };
+    if (data.Generation != gen)
+        return nullptr;
+
+    return data.Pso;
+}
+
+D3D_FEATURE_LEVEL
+CRHIDevice_DX12::_GetMaximumFL(IUnknown* const adapter) const
+{
+    ComPtr<ID3D12Device> device{};
+    if (FAILED(m_D3D12CreateDevice(adapter,
+        D3D_FEATURE_LEVEL_11_0,
+        IID_PPV_ARGS(&device))))
+        return (D3D_FEATURE_LEVEL)0;
+
+    const D3D_FEATURE_LEVEL levels[]{
+        D3D_FEATURE_LEVEL_11_0,
+        D3D_FEATURE_LEVEL_11_1,
+        D3D_FEATURE_LEVEL_12_0,
+        D3D_FEATURE_LEVEL_12_1,
+        D3D_FEATURE_LEVEL_12_2,
+    };
+
+    D3D12_FEATURE_DATA_FEATURE_LEVELS data{};
+    data.NumFeatureLevels = _countof(levels);
+    data.pFeatureLevelsRequested = &levels[0];
+
+    device->CheckFeatureSupport(
+        D3D12_FEATURE_FEATURE_LEVELS,
+        &data,
+        sizeof(D3D12_FEATURE_DATA_FEATURE_LEVELS));
+
+    return data.MaxSupportedFeatureLevel;
 }
 
 CRHISurface_DX12::CRHISurface_DX12(
@@ -1143,6 +1809,8 @@ CRHIFrameGraph_DX12::Initialize(
         return Result::ENullptr;
     }
 
+    m_Parent = device;
+
     const Vector<Vector<u32>> dependencies{ GetDependencies(builder) };
     if ((u32)(flags & FGCompileFlags::LogInfo)) {
         PrintDependencies(dependencies);
@@ -1239,17 +1907,15 @@ CRHIFrameGraph_DX12::Initialize(
             resource_descs.Data())
     };
 
-    if (!alloc_info.SizeInBytes) {
-        LOG_ERROR("No memory requested by frame graph!");
-        return Result::EFrameGraph;
-    }
-
-    m_Heap.Initialize(d3d12, alloc_info.SizeInBytes, alloc_info.Alignment);
-
     Vector<D3D12_RESOURCE_STATES> last_states{};
     last_states.Resize(m_DescResources.Size());
 
-    {
+    if (!alloc_info.SizeInBytes) {
+        LOG_WARNING("No memory requested by frame graph!");
+    }
+    else {
+        m_Heap.Initialize(d3d12, alloc_info.SizeInBytes, alloc_info.Alignment);
+
         u64 heap_offset{};
 
         for (u32 i{ 0 }; i < resources.Size(); ++i) {
@@ -1296,29 +1962,36 @@ CRHIFrameGraph_DX12::Initialize(
     const u32 num_rtvs{ builder.GetRTViewCounter() };
     const u32 num_dsvs{ builder.GetDSViewCounter() };
 
-    DX12DescriptorHeap& srv_heap{ device->GetSrvHeap() };
-    m_SrvHeapData.Start = srv_heap.Allocate(num_srvs);
-    m_SrvHeapData.Count = num_srvs;
-
-    if (m_SrvHeapData.Start == (u32)~0) {
-        LOG_ERROR("Failed to allocate graph descriptors!");
-        return Result::ECreateRHIObject;
-    }
-
-    m_SrvHeapData.CpuStart = srv_heap.GetCpuHandle(m_SrvHeapData.Start);
-    m_SrvHeapData.GpuStart = srv_heap.GetGpuHandle(m_SrvHeapData.Start);
-
     Result::Code res{ Result::Ok };
-    res = m_RtvHeap.Initialize(d3d12, num_rtvs, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, false);
-    if (Result::Fail(res)) {
-        LOG_ERROR("Failed to allocate graph descriptors!");
-        return Result::ECreateRHIObject;
+    DX12DescriptorHeap& srv_heap{ device->GetSrvHeap() };
+
+    if (num_srvs) {
+        m_SrvHeapData.Start = srv_heap.Allocate(num_srvs);
+        m_SrvHeapData.Count = num_srvs;
+
+        if (m_SrvHeapData.Start == (u32)~0) {
+            LOG_ERROR("Failed to allocate graph descriptors!");
+            return Result::ECreateRHIObject;
+        }
+
+        m_SrvHeapData.CpuStart = srv_heap.GetCpuHandle(m_SrvHeapData.Start);
+        m_SrvHeapData.GpuStart = srv_heap.GetGpuHandle(m_SrvHeapData.Start);
     }
 
-    res = m_DsvHeap.Initialize(d3d12, num_dsvs, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, false);
-    if (Result::Fail(res)) {
-        LOG_ERROR("Failed to allocate graph descriptors!");
-        return Result::ECreateRHIObject;
+    if (num_rtvs) {
+        res = m_RtvHeap.Initialize(d3d12, num_rtvs, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, false);
+        if (Result::Fail(res)) {
+            LOG_ERROR("Failed to allocate graph descriptors!");
+            return Result::ECreateRHIObject;
+        }
+    }
+
+    if (num_dsvs) {
+        res = m_DsvHeap.Initialize(d3d12, num_dsvs, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, false);
+        if (Result::Fail(res)) {
+            LOG_ERROR("Failed to allocate graph descriptors!");
+            return Result::ECreateRHIObject;
+        }
     }
 
     std::unordered_map<ViewCacheEntry, u32, ViewCacheHasher> view_cache;
@@ -1602,6 +2275,7 @@ CRHIFrameGraph_DX12::Execute(
 
     Cmd::CommandListData cmd_data{};
     cmd_data.List = m_Queue.List;
+    cmd_data.Device = m_Parent;
     //Dont realloc every frame!
     RHICommandBuilder builder{ 1024 * 1024 };
     builder.Reset();
@@ -1609,7 +2283,7 @@ CRHIFrameGraph_DX12::Execute(
     ID3D12Resource* const surface_buffer{ (ID3D12Resource* const)dx_surface->GetNativeBuffer(dx_surface->GetCurrentBBIndex()) };
     D3D12_RESOURCE_STATES last_surface_state{};
     DX12Barriers barriers{};
-    
+
     for (const auto& pass : m_Passes) {
         const u32 num_rtvs{ pass.NumRtvs };
         const bool has_dsv{ (bool)pass.HasDsv };
@@ -1620,7 +2294,7 @@ CRHIFrameGraph_DX12::Execute(
                 D3D12_RESOURCE_BARRIER b{};
                 b.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
                 b.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-                b.Transition.Subresource = 0;
+                b.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
                 b.Transition.StateBefore = desc.Before;
                 b.Transition.StateAfter = desc.After;
 
@@ -1696,7 +2370,7 @@ CRHIFrameGraph_DX12::Execute(
     present_barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     present_barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
     present_barrier.Transition.pResource = surface_buffer;
-    present_barrier.Transition.Subresource = 0;
+    present_barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     present_barrier.Transition.StateBefore = last_surface_state;
     present_barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
 

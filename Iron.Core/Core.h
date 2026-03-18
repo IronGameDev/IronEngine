@@ -136,6 +136,7 @@ struct LogLevel {
     };
 };
 
+namespace Input {
 struct InputType {
     enum Type : u32 {
         Press = 0,
@@ -173,6 +174,40 @@ struct ModifierKey {
         Control = Key::KeyControl,
     };
 };
+}//Input namespace
+namespace Id {
+constexpr TypeId InvalidId{ (TypeId)~0 };
+constexpr u32 GenerationBits{ 10 };
+constexpr u32 IndexBits{ sizeof(TypeId) * 8 - GenerationBits };
+constexpr TypeId GenerationMask{ (TypeId(1) << GenerationBits) - 1 };
+constexpr TypeId IndexMask{ (TypeId(1) << IndexBits) - 1 };
+
+constexpr inline u32
+Index(TypeId id) {
+    return id & IndexMask;
+}
+
+constexpr inline u32
+Generation(TypeId id) {
+    return id >> IndexBits;
+}
+
+constexpr inline TypeId
+NextGeneration(TypeId id) {
+    const u32 generation{ Generation(id) };
+    return  (generation << IndexBits) | Index(id);
+}
+
+constexpr inline bool
+IsValid(TypeId id) {
+    return id != InvalidId;
+}
+
+constexpr inline TypeId
+MakeHandle(u32 index, u32 generation) {
+    return index | (generation << IndexBits);
+}
+}//Id namespace
 
 CORE_API void* MemAlloc(size_t Size);
 CORE_API void MemFree(void* Block);

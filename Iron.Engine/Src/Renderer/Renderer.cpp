@@ -8,33 +8,47 @@ using namespace Iron::RHI;
 
 namespace Iron {
 namespace {
-IRHIPipelineLayout* layout{};
+RHIPipelineLayout   layout{};
+RHIPipeline         pso{};
 
 void
 RenderStuff(RHICommandBuilder& ctx) {
+}
+
+void
+PostProcess(RHICommandBuilder& ctx) {
+    Viewport vp{ 0.f, 0.f, 1024.f, 768.f, 0.f, 1.f };
+    ScissorRect rc{ 0, 0, 1024, 768 };
+
     ctx.SetGraphicsLayout(layout);
+    ctx.SetPipeline(pso);
+    ctx.SetPrimitiveTopology(PrimitiveTopology::TriangleList);
+    ctx.SetViewports(&vp, 1);
+    ctx.SetScissors(&rc, 1);
+
+    ctx.Draw(3, 0);
 }
 
 void
 SetupRenderer(RHIGraphBuilder& builder) {
-    auto depth = builder.CreateResource({
-        "Depth",
-        FGResourceType::Texture,
-        1920, 1080,
-        RHIFormat::R32_TYPELESS,
-        });
-    auto color = builder.CreateResource({
-        "Color",
-        FGResourceType::Texture,
-        1920, 1080,
-        RHIFormat::R8G8B8A8_TYPELESS
-        });
-    auto ssao = builder.CreateResource({
-        "SSAO",
-        FGResourceType::Texture,
-        1920, 1080,
-        RHIFormat::R8_TYPELESS
-        });
+    //auto depth = builder.CreateResource({
+    //    "Depth",
+    //    FGResourceType::Texture,
+    //    1920, 1080,
+    //    RHIFormat::R32_TYPELESS,
+    //    });
+    //auto color = builder.CreateResource({
+    //    "Color",
+    //    FGResourceType::Texture,
+    //    1920, 1080,
+    //    RHIFormat::R8G8B8A8_TYPELESS
+    //    });
+    //auto ssao = builder.CreateResource({
+    //    "SSAO",
+    //    FGResourceType::Texture,
+    //    1920, 1080,
+    //    RHIFormat::R8_TYPELESS
+    //    });
     auto bb = builder.RegisterOutput(
         "Swapchain",
         1024,
@@ -43,25 +57,25 @@ SetupRenderer(RHIGraphBuilder& builder) {
         true
     );
 
-    builder.BeginPass("DepthPrePass", RenderStuff);
-    builder.AddDepth(depth, RHIFormat::D32_FLOAT, ResourceState::DepthWrite);
-    builder.EndPass();
+    //builder.BeginPass("DepthPrePass", RenderStuff);
+    //builder.AddDepth(depth, RHIFormat::D32_FLOAT, ResourceState::DepthWrite);
+    //builder.EndPass();
 
-    builder.BeginPass("SSAOPass", RenderStuff);
-    builder.Read(depth, RHIFormat::R32_FLOAT, ResourceState::NonPixelResource, 0);
-    builder.Write(ssao, RHIFormat::R8_UNORM, ResourceState::RenderTarget, 0);
-    builder.EndPass();
+    //builder.BeginPass("SSAOPass", RenderStuff);
+    //builder.Read(depth, RHIFormat::R32_FLOAT, ResourceState::NonPixelResource, 0);
+    //builder.Write(ssao, RHIFormat::R8_UNORM, ResourceState::RenderTarget, 0);
+    //builder.EndPass();
 
-    builder.BeginPass("ColorPass", RenderStuff);
-    builder.AddDepth(depth, RHIFormat::D32_FLOAT, ResourceState::DepthRead);
-    builder.Read(ssao, RHIFormat::R8_UNORM, ResourceState::PixelResource, 0);
-    builder.Write(color, RHIFormat::R8G8B8A8_UNORM, ResourceState::RenderTarget, 0);
-    builder.EndPass();
+    //builder.BeginPass("ColorPass", RenderStuff);
+    //builder.AddDepth(depth, RHIFormat::D32_FLOAT, ResourceState::DepthRead);
+    //builder.Read(ssao, RHIFormat::R8_UNORM, ResourceState::PixelResource, 0);
+    //builder.Write(color, RHIFormat::R8G8B8A8_UNORM, ResourceState::RenderTarget, 0);
+    //builder.EndPass();
 
-    builder.BeginPass("PostProcess", RenderStuff);
-    builder.Read(depth, RHIFormat::R32_FLOAT, ResourceState::PixelResource, 0);
-    builder.Read(color, RHIFormat::R8G8B8A8_UNORM, ResourceState::PixelResource, 1);
-    builder.WriteClear(bb, RHIFormat::R8G8B8A8_UNORM_SRGB, ResourceState::RenderTarget, 0, { 0.f, 0.7f, 0.f, 1.f });
+    builder.BeginPass("PostProcess", PostProcess);
+    //builder.Read(depth, RHIFormat::R32_FLOAT, ResourceState::PixelResource, 0);
+    //builder.Read(color, RHIFormat::R8G8B8A8_UNORM, ResourceState::PixelResource, 1);
+    builder.WriteClear(bb, RHIFormat::R8G8B8A8_UNORM, ResourceState::RenderTarget, 0, { 0.f, 0.7f, 0.f, 1.f });
     builder.EndPass();
 }
 }//anonymous namespace
@@ -125,6 +139,44 @@ RenderContext::RenderContext(void* factoryPtr)
     }
 
     m_Error = res;
+
+    PipelineLayoutParam params[1]{};
+    params[0].AsSRV(0, 0);
+
+    PipelineLayoutInitInfo l_info{};
+    l_info.NumParams = _countof(params);
+    l_info.Params = &params[0];
+
+    m_Device->CreatePipelineLayout(l_info, &layout);
+
+    GraphicsPipelineInitInfo pso_info{ layout };
+    u8* vs_blob{};
+    u64 vs_size{};
+    u8* ps_blob{};
+    u64 ps_size{};
+
+    if (device_info.Backend == RHIBackend::DirectX12) {
+        ReadFile("D:\\code\\IronEngine\\EngineAssets\\D3D12\\Bin\\FullscreenVS.bin", vs_blob, vs_size);
+        ReadFile("D:\\code\\IronEngine\\EngineAssets\\D3D12\\Bin\\ColorPS.bin", ps_blob, ps_size);
+    }
+    else {
+        ReadFile("D:\\code\\IronEngine\\EngineAssets\\D3D11\\Bin\\FullscreenVS.bin", vs_blob, vs_size);
+        ReadFile("D:\\code\\IronEngine\\EngineAssets\\D3D11\\Bin\\ColorPS.bin", ps_blob, ps_size);
+    }
+
+    pso_info.VS.Blob = vs_blob + sizeof(u32);
+    pso_info.VS.Size = vs_size - sizeof(u32);
+    pso_info.PS.Blob = ps_blob + sizeof(u32);
+    pso_info.PS.Size = ps_size - sizeof(u32);
+    pso_info.TargetFormats[0] = RHIFormat::R8G8B8A8_UNORM;
+    pso_info.NumTargets = 1;
+    pso_info.DepthStencil.DepthEnable = false;
+    pso_info.Rasterizer.Cull = CullMode::None;
+
+    m_Device->CreateGraphicsPipeline(pso_info, &pso);
+
+    MemFree(vs_blob);
+    MemFree(ps_blob);
 }
 
 Result::Code
@@ -164,39 +216,30 @@ RenderContext::InitializeForWindow(Window::IWindow* const window) {
     info.CPUWrite = true;
     info.Flags = ResourceFlags::AllowShaderResource;
 
-    IRHIResource* resss[3]{};
+    RHIResource resss[3]{};
 
     m_Device->CreateResource(info, &resss[0]);
 
-    SafeRelease(resss[0]);
+    m_Device->DestroyResource(resss[0]);
 
     m_Device->CreateResource(info, &resss[0]);
     m_Device->CreateResource(info, &resss[1]);
     m_Device->CreateResource(info, &resss[2]);
-    SafeRelease(resss[0]);
-    SafeRelease(resss[1]);
-    
-    m_Device->CreateResource(info, &resss[0]);
-    
-    SafeRelease(resss[2]);
-    SafeRelease(resss[0]);
+    m_Device->DestroyResource(resss[0]);
+    m_Device->DestroyResource(resss[1]);
 
     m_Device->CreateResource(info, &resss[0]);
-    SafeRelease(resss[0]);
+
+    m_Device->DestroyResource(resss[2]);
+    m_Device->DestroyResource(resss[0]);
+
+    m_Device->CreateResource(info, &resss[0]);
+    m_Device->DestroyResource(resss[0]);
 
     RHIGraphBuilder builder{};
     SetupRenderer(builder);
-    
+
     m_Device->CreateFrameGraph(builder, FGCompileFlags::LogInfo | FGCompileFlags::DebugNames, &m_FrameGraph);
-
-    PipelineLayoutParam params[1]{};
-    params[0].AsSRV(0, 0);
-
-    PipelineLayoutInitInfo l_info{};
-    l_info.NumParams = _countof(params);
-    l_info.Params = &params[0];
-
-    m_Device->CreatePipelineLayout(l_info, &layout);
 
     return res;
 }
@@ -205,7 +248,8 @@ void
 RenderContext::Release() {
     m_FrameGraph->WaitIdle();
 
-    SafeRelease(layout);
+    m_Device->DestroyPipelineLayout(layout);
+    m_Device->DestroyPipeline(pso);
 
     SafeRelease(m_FrameGraph);
     SafeRelease(m_Surface);
