@@ -4,6 +4,8 @@
 MAKE_VERSION(Windowing, 0, 1, 0)
 
 namespace Iron::Window {
+typedef void(*WindowProc)(void*, u32, u64, u64);
+
 struct WindowInitInfo {
     u32             Width;
     u32             Height;
@@ -28,6 +30,9 @@ public:
     virtual ~IWindow() = default;
 
     virtual void PumpMessages() = 0;
+
+    virtual void AttachProc(
+        WindowProc& proc) = 0;
 
     virtual void SetBackground(
         Math::V3 color) = 0;

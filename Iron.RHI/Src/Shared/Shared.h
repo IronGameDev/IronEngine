@@ -25,6 +25,8 @@ static const char* HrToString(HRESULT hr) {
 
 static u64
 HashBytes(const void* data, size_t size, u64 hash = 1469598103934665603ull) {
+    if (!data) return hash;
+
     const uint8_t* bytes = reinterpret_cast<const uint8_t*>(data);
     for (size_t i = 0; i < size; ++i) {
         hash ^= bytes[i];

@@ -18,4 +18,11 @@
     <FxCompile Include="$(MSBuildThisFileDirectory)DXCommon\ColorPS.hlsl" />
     <FxCompile Include="$(MSBuildThisFileDirectory)DXCommon\FullscreenVS.hlsl" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(MSBuildThisFileDirectory)External\Nlohmann\json.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)Content\AssetRegistry.json" />
+    <None Include="$(MSBuildThisFileDirectory)Pipelines\BasicTriangle.json" />
+  </ItemGroup>
 </Project>

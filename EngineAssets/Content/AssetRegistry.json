@@ -1,0 +1,15 @@
+{
+  "lastpacktime": 0,
+  "assets": [
+    {
+      "name": "ColorPS",
+      "filename": "ColorPS.hlsl",
+      "type": "shader"
+    },
+    {
+      "name": "FullscreenTriangleVS",
+      "filename": "FullscreenVS.hlsl",
+      "type": "shader"
+    }
+  ]
+}

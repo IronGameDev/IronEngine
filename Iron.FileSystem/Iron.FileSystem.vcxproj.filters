@@ -18,15 +18,12 @@
     <ClCompile Include="Src\dllmain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Win32Input.cpp">
+    <ClCompile Include="Src\FileSystem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Input.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="InputDefines.h">
+    <ClInclude Include="FileSystem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

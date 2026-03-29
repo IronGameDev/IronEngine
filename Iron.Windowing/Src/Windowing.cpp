@@ -26,7 +26,11 @@ public:
 
     void Hint(
         WindowHint::Hint hint);
+
     void PumpMessages() override;
+
+    void AttachProc(
+        WindowProc& proc) override;
 
     void SetBackground(
         Math::V3 color) override;
@@ -70,6 +74,8 @@ public:
     constexpr DWORD GetBackgroundDWORD() const {
         return m_Background;
     }
+
+    WindowProc              m_SecProc;
 
 private:
     HWND                    m_Hwnd;
@@ -141,6 +147,11 @@ WndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
         break;
     }
 
+    CWindow* const parent{ GetFromHandle(hwnd) };
+    if (parent && parent->m_SecProc) {
+        parent->m_SecProc(hwnd, msg, wparam, lparam);
+    }
+
     return DefWindowProcA(hwnd, msg, wparam, lparam);
 }
 
@@ -148,7 +159,8 @@ CWindow::CWindow(const WindowInitInfo& initInfo)
     : m_Fullscreen(false), m_Open(false),
     m_Background(RGB(24, 48, 87)),
     m_NormalRect(),
-    m_CurrentRect() {
+    m_CurrentRect(),
+    m_SecProc() {
 
     WNDCLASSEXA wc{};
     wc.cbSize = sizeof(WNDCLASSEXA);
@@ -225,6 +237,11 @@ CWindow::PumpMessages() {
         TranslateMessage(&msg);
         DispatchMessageA(&msg);
     }
+}
+
+void
+CWindow::AttachProc(WindowProc& proc) {
+    m_SecProc = proc;
 }
 
 void

@@ -30,6 +30,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{8EC462FD-D22E-90A8-E5CE-7E832BA40C5D}"
 	ProjectSection(SolutionItems) = preProject
 		iron.ico = iron.ico
+		External\Nlohmann\json.hpp = External\Nlohmann\json.hpp
 		settings.ini = settings.ini
 		TODO.txt = TODO.txt
 	EndProjectSection
@@ -42,6 +43,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Iron.AssetCompiler", "Iron.
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "EngineAssets", "EngineAssets\EngineAssets.vcxitems", "{71C762CD-FEBF-4CF8-B8CB-27599A6EC357}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Iron.FileSystem", "Iron.FileSystem\Iron.FileSystem.vcxproj", "{37A86412-F8EA-4DAC-AC4F-BC87D60E12F3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -107,6 +110,14 @@ Global
 		{F9BF713F-9451-47DC-B0BF-3D3F42AA3E34}.Release|x64.Build.0 = Release|x64
 		{F9BF713F-9451-47DC-B0BF-3D3F42AA3E34}.Release|x86.ActiveCfg = Release|Win32
 		{F9BF713F-9451-47DC-B0BF-3D3F42AA3E34}.Release|x86.Build.0 = Release|Win32
+		{37A86412-F8EA-4DAC-AC4F-BC87D60E12F3}.Debug|x64.ActiveCfg = Debug|x64
+		{37A86412-F8EA-4DAC-AC4F-BC87D60E12F3}.Debug|x64.Build.0 = Debug|x64
+		{37A86412-F8EA-4DAC-AC4F-BC87D60E12F3}.Debug|x86.ActiveCfg = Debug|Win32
+		{37A86412-F8EA-4DAC-AC4F-BC87D60E12F3}.Debug|x86.Build.0 = Debug|Win32
+		{37A86412-F8EA-4DAC-AC4F-BC87D60E12F3}.Release|x64.ActiveCfg = Release|x64
+		{37A86412-F8EA-4DAC-AC4F-BC87D60E12F3}.Release|x64.Build.0 = Release|x64
+		{37A86412-F8EA-4DAC-AC4F-BC87D60E12F3}.Release|x86.ActiveCfg = Release|Win32
+		{37A86412-F8EA-4DAC-AC4F-BC87D60E12F3}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

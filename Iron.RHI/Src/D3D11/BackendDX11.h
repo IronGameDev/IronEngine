@@ -74,7 +74,8 @@ public:
 
     struct PipelineLayout {
         u32                     Start{};
-        u32                     Count{};
+        u32                     Count : 16{};
+        u32                     PCSize : 16{};
         u32                     Generation{};
     };
 
@@ -236,8 +237,20 @@ public:
 
     ID3D11Resource* const ResolveResource(RHIResource handle) const;
     const PipelineData ResolvePipelineData(RHIPipeline pso) const;
-    const GraphicsPipeline& ResolveGraphicsPipeline(const PipelineData& data) const;
-    const ComputePipeline& ResolveComputePipeline(const PipelineData& data) const;
+    const PipelineLayout ResolvePipelineLayout(RHIPipelineLayout layout) const;
+    const GraphicsPipeline ResolveGraphicsPipeline(const PipelineData& data) const;
+    const ComputePipeline ResolveComputePipeline(const PipelineData& data) const;
+
+    PipelineLayoutParam* const GetParams(u32 start) {
+        if (start >= m_PipelineParams.Size())
+            return nullptr;
+
+        return &m_PipelineParams[start];
+    }
+
+    constexpr bool HasPC() const {
+        return m_Features.PushConstants;
+    }
 
 private:
     IRHIFactory*                m_Factory;

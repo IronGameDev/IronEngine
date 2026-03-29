@@ -33,9 +33,17 @@ Result::Code
 ReadFile(const char* file,
     u8*& data,
     u64& length) {
+    if (!file) {
+        return Result::ENullptr;
+    }
+
+    if (!std::filesystem::exists(file)) {
+        return Result::ELoadfile;
+    }
+
     const u64 size{ std::filesystem::file_size(file) };
 
-    if (!std::filesystem::exists(file) || !size) {
+    if (!size) {
         return Result::ELoadfile;
     }
 

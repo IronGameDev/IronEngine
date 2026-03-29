@@ -229,11 +229,24 @@ inline void SetDebugName(ID3D11DeviceChild* object, const char* name) {
 
 namespace Cmd {
 struct CommandListData {
+    constexpr static u32 PCIncrSize{ RHI_MAX_PUSH_CONSTANTS_IN_32BIT * sizeof(u32) };
+
     ID3D11DeviceContext4*           Ctx{};
     CRHIDevice_DX11*                Device{};
 
     bool                            GraphicsLayout{};
     RHIPipelineLayout               CurrentLayout{ Id::InvalidId };
+    struct {
+        PipelineLayoutParam*        BaseParam{};
+        u32                         NumParams{};
+        u32                         PCSize{};
+    } Layout;
+
+    struct {
+        ID3D11Buffer*               Buffer{};
+        u32                         Offset{};
+        D3D11_MAPPED_SUBRESOURCE    Map{};
+    } PC;
 
     ID3D11ComputeShader*            CurrentCS{};
     ID3D11VertexShader*             CurrentVS{};
@@ -249,6 +262,77 @@ struct CommandListData {
     u32                             CounterDrawInstanced{};
     u32                             CounterDrawIndexed{};
     u32                             CounterDrawIndexedInstanced{};
+
+    void Reset() {
+        SafeRelease(PC.Buffer);
+
+        GraphicsLayout = true;
+        CurrentLayout = Id::InvalidId;
+
+        Layout.BaseParam = nullptr;
+        Layout.NumParams = 0;
+        Layout.PCSize = 0;
+
+        PC.Offset = 0;
+
+        CurrentCS = nullptr;
+        CurrentVS = nullptr;
+        CurrentPS = nullptr;
+        CurrentDS = nullptr;
+        CurrentHS = nullptr;
+        CurrentGS = nullptr;
+        CurrentBlend = nullptr;
+        CurrentRaster = nullptr;
+        CurrentDepth = nullptr;
+
+        CounterDraw = 0;
+        CounterDrawInstanced = 0;
+        CounterDrawIndexed = 0;
+        CounterDrawIndexedInstanced = 0;
+    }
+
+    bool InitPCBuffer(u32 size) {
+        if (!(Device && Ctx)) {
+            return false;
+        }
+
+        D3D11_BUFFER_DESC desc{};
+        desc.ByteWidth = size;
+        desc.Usage = D3D11_USAGE_DYNAMIC;
+        desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        desc.MiscFlags = 0;
+        desc.StructureByteStride = 0;
+
+        ID3D11Device5* const d3d11{ (ID3D11Device5* const)Device->GetNative() };
+        HRESULT hr{ S_OK };
+        hr = d3d11->CreateBuffer(&desc, nullptr, &PC.Buffer);
+
+        return SUCCEEDED(hr);
+    }
+
+    bool PushBegin() {
+        if (!PC.Buffer)
+            return false;
+
+        HRESULT hr{ S_OK };
+        hr = Ctx->Map(PC.Buffer,
+            0,
+            D3D11_MAP_WRITE_DISCARD,
+            0,
+            &PC.Map);
+
+        PC.Offset = 0;
+
+        return SUCCEEDED(hr);
+    }
+
+    void PushEnd() {
+        Ctx->Unmap(PC.Buffer, 0);
+
+        PC.Offset = 0;
+        PC.Map = {};
+    }
 };
 
 typedef void(*CommandFunc)(CommandListData&, const void*);
@@ -265,10 +349,12 @@ void
 SetGraphicsLayout(CommandListData& cmdData, const void* data) {
     const RHICommandBuilder::CmdSetGraphicsLayoutInfo& info{ *(const RHICommandBuilder::CmdSetGraphicsLayoutInfo*)data };
     if (cmdData.CurrentLayout != info.Layout) {
-        //ID3D12RootSignature* root_sig{ cmdData.Device->ResolveLayout(info.Layout) };
-        //cmdData.Ctx->SetGraphicsRootSignature(root_sig);
+        CRHIDevice_DX11::PipelineLayout layout{ cmdData.Device->ResolvePipelineLayout(info.Layout) };
         cmdData.GraphicsLayout = true;
         cmdData.CurrentLayout = info.Layout;
+        cmdData.Layout.BaseParam = cmdData.Device->GetParams(layout.Start);
+        cmdData.Layout.NumParams = layout.Count;
+        cmdData.Layout.PCSize = layout.PCSize;
     }
 }
 
@@ -276,10 +362,12 @@ void
 SetComputeLayout(CommandListData& cmdData, const void* data) {
     const RHICommandBuilder::CmdSetGraphicsLayoutInfo& info{ *(const RHICommandBuilder::CmdSetGraphicsLayoutInfo*)data };
     if (cmdData.CurrentLayout != info.Layout) {
-        //ID3D12RootSignature* root_sig{ cmdData.Device->ResolveLayout(info.Layout) };
-        //cmdData.Ctx->SetComputeRootSignature(root_sig);
+        CRHIDevice_DX11::PipelineLayout layout{ cmdData.Device->ResolvePipelineLayout(info.Layout) };
         cmdData.GraphicsLayout = false;
         cmdData.CurrentLayout = info.Layout;
+        cmdData.Layout.BaseParam = cmdData.Device->GetParams(layout.Start);
+        cmdData.Layout.NumParams = layout.Count;
+        cmdData.Layout.PCSize = layout.PCSize;
     }
 }
 
@@ -372,6 +460,66 @@ SetScissor(CommandListData& cmdData, const void* data) {
 }
 
 void
+SetPushConstants(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdSetPushConstants& info{ *(const RHICommandBuilder::CmdSetPushConstants*)data };
+    const u32 rounded{ ((cmdData.Layout.PCSize + 15) / 16) * 16 };
+    u32& offset{ cmdData.PC.Offset };
+
+    if (cmdData.GraphicsLayout) {
+        if (cmdData.CurrentVS) {
+            cmdData.Ctx->VSSetConstantBuffers1(
+                0,
+                1,
+                &cmdData.PC.Buffer,
+                &offset,
+                &rounded);
+        }
+        if (cmdData.CurrentPS) {
+            cmdData.Ctx->PSSetConstantBuffers1(
+                0,
+                1,
+                &cmdData.PC.Buffer,
+                &offset,
+                &rounded);
+        }
+        if (cmdData.CurrentDS) {
+            cmdData.Ctx->DSSetConstantBuffers1(
+                0,
+                1,
+                &cmdData.PC.Buffer,
+                &offset,
+                &rounded);
+        }
+        if (cmdData.CurrentHS) {
+            cmdData.Ctx->HSSetConstantBuffers1(
+                0,
+                1,
+                &cmdData.PC.Buffer,
+                &offset,
+                &rounded);
+        }
+        if (cmdData.CurrentGS) {
+            cmdData.Ctx->GSSetConstantBuffers1(
+                0,
+                1,
+                &cmdData.PC.Buffer,
+                &offset,
+                &rounded);
+        }
+    }
+    else {
+        cmdData.Ctx->CSSetConstantBuffers1(
+            0,
+            1,
+            &cmdData.PC.Buffer,
+            &offset,
+            &rounded);
+    }
+
+    offset += CommandListData::PCIncrSize;
+}
+
+void
 Draw(CommandListData& cmdData, const void* data) {
     const RHICommandBuilder::CmdDrawInfo& info{ *(const RHICommandBuilder::CmdDrawInfo*)data };
     cmdData.Ctx->Draw(info.VertexCount, info.BaseVertex);
@@ -407,6 +555,7 @@ constexpr static CommandFunc DispatchTable[RHICommandBuilder::CommandId::Count]{
     SetPrimitiveTopology,
     SetViewport,
     SetScissor,
+    SetPushConstants,
     Draw,
     DrawInstanced,
     DrawIndexed,
@@ -420,15 +569,40 @@ ParseCommandStream(RHICommandBuilder& builder, CommandListData& cmdData) {
     }
 
     const u32 total_size{ builder.GetOffset() };
-    const u8* stream{ builder.GetStream() };
+    const u8* start{ builder.GetStream() };
+    const u8* stream{ start };
     const u8* const end{ stream + total_size };
+
+    if (cmdData.PushBegin()) {
+        while (stream < end) {
+            const RHICommandBuilder::CmdHeader header{ *(const RHICommandBuilder::CmdHeader*)stream };
+            if (header.Id >= RHICommandBuilder::CommandId::Count) {
+                LOG_ERROR("Invalid command id used!");
+            }
+
+            stream += sizeof(RHICommandBuilder::CmdHeader);
+
+            if (header.Id == RHICommandBuilder::CommandId::SetPushConstants) {
+                const RHICommandBuilder::CmdSetPushConstants& info{ *(const RHICommandBuilder::CmdSetPushConstants*)stream };
+
+                u8* const map_ptr{ (u8*)cmdData.PC.Map.pData };
+
+                MemCopy(map_ptr + cmdData.PC.Offset, &info.Constants[0], CommandListData::PCIncrSize);
+
+                cmdData.PC.Offset += CommandListData::PCIncrSize;
+            }
+
+            stream += header.PayloadSize;
+        }
+
+        cmdData.PushEnd();
+        cmdData.PC.Offset = 0;
+    }
+
+    stream = start;
 
     while (stream < end) {
         const RHICommandBuilder::CmdHeader header{ *(const RHICommandBuilder::CmdHeader*)stream };
-        if (header.Id >= RHICommandBuilder::CommandId::Count) {
-            LOG_ERROR("Invalid command id used!");
-        }
-
         stream += sizeof(RHICommandBuilder::CmdHeader);
         DispatchTable[header.Id](cmdData, stream);
         stream += header.PayloadSize;
@@ -508,8 +682,19 @@ CRHIDevice_DX11::CRHIDevice_DX11(
     device->QueryInterface(IID_PPV_ARGS(&m_Device));
     context->QueryInterface(IID_PPV_ARGS(&m_Context));
 
+    if (m_Debug) {
+        ComPtr<ID3D11InfoQueue> queue{};
+        if (SUCCEEDED(m_Device->QueryInterface(IID_PPV_ARGS(&queue)))) {
+            queue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_WARNING, true);
+            queue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, true);
+            queue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, true);
+        }
+    }
+
+    D3D11_FEATURE_DATA_D3D11_OPTIONS d3d11_options{ QueryFeatureSupport<D3D11_FEATURE_DATA_D3D11_OPTIONS>() };
+
     m_Features.Bindless = false;
-    m_Features.PushConstants = false;
+    m_Features.PushConstants = d3d11_options.ConstantBufferPartialUpdate & d3d11_options.ConstantBufferOffsetting;
     m_Features.FeatureLevel.Major = ((m_FeatureLevel >> 8) & 0xf0) >> 4;
     m_Features.FeatureLevel.Minor = (m_FeatureLevel >> 8) & 0xf;
 
@@ -551,6 +736,13 @@ CRHIDevice_DX11::Release() {
     SafeRelease(m_Context);
 
     if (m_Debug) {
+        ComPtr<ID3D11InfoQueue> queue{};
+        if (SUCCEEDED(m_Device->QueryInterface(IID_PPV_ARGS(&queue)))) {
+            queue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_WARNING, false);
+            queue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, false);
+            queue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, false);
+        }
+
         ComPtr<ID3D11Debug> debug{};
         if (SUCCEEDED(m_Device->QueryInterface(IID_PPV_ARGS(&debug)))) {
             debug->ReportLiveDeviceObjects(D3D11_RLDO_SUMMARY | D3D11_RLDO_DETAIL | D3D11_RLDO_IGNORE_INTERNAL);
@@ -700,8 +892,8 @@ CRHIDevice_DX11::CreatePipelineLayout(const PipelineLayoutInitInfo& info,
 
     *outHandle = Id::InvalidId;
 
-    if (info.PushConstantSize) {
-        LOG_ERROR("D3D11 Push constants not supported yet!");
+    if (info.PushConstantSize && !HasPC()) {
+        LOG_ERROR("D3D11 Push constants not supported!");
         return Result::EInvalidarg;
     }
 
@@ -723,6 +915,11 @@ CRHIDevice_DX11::CreatePipelineLayout(const PipelineLayoutInitInfo& info,
 
     PipelineLayout& layout{ m_PipelineLayouts[index] };
     layout.Count = info.NumParams;
+    layout.PCSize = info.PushConstantSize * sizeof(u32);
+    if (layout.PCSize && !HasPC()) {
+        LOG_ERROR("Push constants not supported!");
+        return Result::ENoInterface;
+    }
 
     if (!layout.Start) {
         layout.Start = m_PipelineParams.Size();
@@ -1179,14 +1376,30 @@ CRHIDevice_DX11::ResolvePipelineData(RHIPipeline pso) const {
     return slot;
 }
 
+const CRHIDevice_DX11::PipelineLayout
+CRHIDevice_DX11::ResolvePipelineLayout(RHIPipelineLayout layout) const {
+    if (!Id::IsValid(layout)) {
+        return {};
+    }
+
+    u32 index{ Id::Index(layout) };
+    u32 gen{ Id::Index(layout) };
+
+    const auto& slot{ m_PipelineLayouts[index] };
+    if (slot.Generation != gen)
+        return {};
+
+    return slot;
+}
+
 const
-CRHIDevice_DX11::GraphicsPipeline&
+CRHIDevice_DX11::GraphicsPipeline
 CRHIDevice_DX11::ResolveGraphicsPipeline(const PipelineData& data) const {
     return m_GraphicsPipelines[data.Index];
 }
 
 const
-CRHIDevice_DX11::ComputePipeline&
+CRHIDevice_DX11::ComputePipeline
 CRHIDevice_DX11::ResolveComputePipeline(const PipelineData& data) const {
     return m_ComputePipelines[data.Index];
 }
@@ -1652,6 +1865,9 @@ CRHIFrameGraph_DX11::Execute(
     Cmd::CommandListData cmd_data{};
     cmd_data.Ctx = m_Ctx;
     cmd_data.Device = m_Device;
+    if (m_Device->HasPC()) {
+        cmd_data.InitPCBuffer(1024);
+    }
 
     RHICommandBuilder builder{ 1024 * 1024 };
     builder.Reset();
@@ -1708,6 +1924,8 @@ CRHIFrameGraph_DX11::Execute(
     }
 
     dx_surface->Present();
+
+    cmd_data.Reset();
 }
 
 Vector<Vector<u32>>

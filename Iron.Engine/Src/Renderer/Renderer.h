@@ -34,5 +34,6 @@ private:
 
     bool                    m_AllowTearing : 1{};
     bool                    m_TripleBuffering : 1{};
+    bool                    m_LegacyDevice : 1{};
 };
 }

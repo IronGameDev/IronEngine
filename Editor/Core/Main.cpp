@@ -4,16 +4,19 @@
 #include <Iron.Windowing/Windowing.h>
 #include <Iron.RHI/RHI.h>
 
+#include <Editor/Assets/AssetRegistry.h>
+
 #pragma comment(lib, "iron.core.lib")
 #pragma comment(lib, "iron.engine.lib")
 
 using namespace Iron;
 using namespace Iron::RHI;
 using namespace Iron::Window;
+using namespace Iron::Editor;
 
-class Editor : public Application {
+class CEditor : public Application {
 public:
-    ~Editor() override = default;
+    ~CEditor() override = default;
 
     Result::Code PreInitialize() override {
         using namespace Iron::AssetCompiler;
@@ -25,8 +28,10 @@ public:
         if (!assets)
             return Result::ELoadlibrary;
 
+        bool d3d12{ true };
+
         IShaderCompiler* compiler{};
-        assets->CreateShaderCompiler({ 5, 0, 0 }, &compiler);
+        assets->CreateShaderCompiler({ (u32)(d3d12 ? 6 : 5), (u32)(d3d12 ? 6 : 0), 0 }, &compiler);
         if (!compiler)
             return Result::ECreateResource;
 
@@ -40,14 +45,18 @@ public:
         IShader* shader{};
         compiler->CompileShaderFromFile("D:\\code\\IronEngine\\EngineAssets\\DXCommon\\FullscreenVS.hlsl",
             info, &shader);
-        if (shader) shader->SaveToFile("D:\\code\\IronEngine\\EngineAssets\\D3D11\\Bin\\FullscreenVS.bin");
+        if (shader) shader->SaveToFile(d3d12
+            ? "D:\\code\\IronEngine\\EngineAssets\\D3D12\\Bin\\FullscreenVS.bin"
+            : "D:\\code\\IronEngine\\EngineAssets\\D3D11\\Bin\\FullscreenVS.bin");
         SafeRelease(shader);
 
         info.Type = RHI::ShaderType::Pixel;
         info.Entry = "ColorPS";
         compiler->CompileShaderFromFile("D:\\code\\IronEngine\\EngineAssets\\DXCommon\\ColorPS.hlsl",
             info, &shader);
-        if (shader) shader->SaveToFile("D:\\code\\IronEngine\\EngineAssets\\D3D11\\Bin\\ColorPS.bin");
+        if (shader) shader->SaveToFile(d3d12
+            ? "D:\\code\\IronEngine\\EngineAssets\\D3D12\\Bin\\ColorPS.bin"
+            : "D:\\code\\IronEngine\\EngineAssets\\D3D11\\Bin\\ColorPS.bin");
         SafeRelease(shader);
 
         UnloadPlugin("Iron.AssetCompiler.dll");
@@ -56,7 +65,8 @@ public:
     }
 
     Result::Code PostInitialize() override {
-        
+        Assets::g_AssetRegistry.Load("D:\\code\\IronEngine\\EngineAssets\\Content\\AssetRegistry.json");
+
         return Result::Code::Ok;
     }
 
@@ -82,7 +92,7 @@ int main(int argc, char** argv) {
     engine_info.Headless = false;
     engine_info.Window.Fullscreen = false;
     
-    Editor instance{};
+    CEditor instance{};
 
     Result::Code result{};
     result = RunEngine(engine_info, &instance);

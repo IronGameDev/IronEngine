@@ -307,7 +307,7 @@ private:
 };
 
 class CRHIDevice_DX12 : public IRHIDevice {
-private:
+public:
     struct ResourceSlot {
         u32         Generation : Id::GenerationBits{};
         u32         DenseIndex : (32 - Id::GenerationBits) {};
@@ -322,6 +322,8 @@ private:
     struct PipelineLayout {
         ID3D12RootSignature*    RootSig{};
         u32                     Generation{};
+        u32                     NumParams : 16{};
+        u32                     NumConstants : 16{};
     };
 
     struct Pipeline {
@@ -405,7 +407,7 @@ public:
     }
 
     ID3D12Resource* const ResolveResource(RHIResource handle) const;
-    ID3D12RootSignature* const ResolveLayout(RHIPipelineLayout layout) const;
+    PipelineLayout ResolveLayout(RHIPipelineLayout layout) const;
     ID3D12PipelineState* const ResolvePso(RHIPipeline pso) const;
 
 private:

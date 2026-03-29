@@ -14,6 +14,7 @@ All functional interfaces should only be defined in RHI.h
 #define RHI_MAX_TEMPORAL 1 << RHI_TEMPORAL_COUNT_BITS
 #define RHI_MAX_VIEWS_PER_TYPE (1 << RHI_VIEW_INDEX_BITS) - 1
 #define RHI_MAX_TARGET_COUNT 8
+#define RHI_MAX_PUSH_CONSTANTS_IN_32BIT 32
 #define RHI_TEMPORAL_COUNT_BITS 4
 #define RHI_VIEW_INDEX_BITS 12
 #define RHI_COMMAND_ALIGN 8
@@ -572,6 +573,7 @@ struct PipelineLayoutInitInfo {
 
     //TODO: Static samplers
 
+    //In 32bit constants
     u32                             PushConstantSize;
 };
 
@@ -791,6 +793,7 @@ public:
             SetPrimitiveTopology,
             SetViewports,
             SetScissors,
+            SetPushConstants,
             Draw,
             DrawInstanced,
             DrawIndexed,
@@ -833,6 +836,10 @@ public:
     struct CmdSetScissorsInfo {
         ScissorRect             Rects[RHI_MAX_TARGET_COUNT];
         u32                     Count;
+    };
+
+    struct CmdSetPushConstants {
+        u32                     Constants[RHI_MAX_PUSH_CONSTANTS_IN_32BIT];
     };
 
     struct CmdDrawInfo {
@@ -967,6 +974,15 @@ public:
         cmd->Count = count;
         for (u32 i{ 0 }; i < count; ++i) {
             cmd->Rects[i] = rects[i];
+        }
+    }
+
+    inline void SetPushConstants(u32 numConstants, u32* const constants) {
+        auto* cmd{ Allocate<CmdSetPushConstants>(CommandId::SetPushConstants) };
+        RHI_VALIDATE_CMD(cmd);
+        MemSet(cmd->Constants, 0x00, RHI_MAX_PUSH_CONSTANTS_IN_32BIT * sizeof(u32));
+        for (u32 i{ 0 }; i < Math::Min(numConstants, (u32)RHI_MAX_PUSH_CONSTANTS_IN_32BIT); ++i) {
+            cmd->Constants[i] = constants[i];
         }
     }
 

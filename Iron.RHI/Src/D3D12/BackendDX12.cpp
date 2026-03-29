@@ -394,6 +394,7 @@ struct CommandListData {
     bool                            GraphicsLayout{};
     RHIPipelineLayout               CurrentLayout{ Id::InvalidId };
     RHIPipeline                     CurrentPipeline{ Id::InvalidId };
+    CRHIDevice_DX12::PipelineLayout ResolvedLayout{};
 
     u32                             CounterDraw{};
     u32                             CounterDrawInstanced{};
@@ -415,8 +416,8 @@ void
 SetGraphicsLayout(CommandListData& cmdData, const void* data) {
     const RHICommandBuilder::CmdSetGraphicsLayoutInfo& info{ *(const RHICommandBuilder::CmdSetGraphicsLayoutInfo*)data };
     if (cmdData.CurrentLayout != info.Layout) {
-        ID3D12RootSignature* root_sig{ cmdData.Device->ResolveLayout(info.Layout) };
-        cmdData.List->SetGraphicsRootSignature(root_sig);
+        cmdData.ResolvedLayout = cmdData.Device->ResolveLayout(info.Layout);
+        cmdData.List->SetGraphicsRootSignature(cmdData.ResolvedLayout.RootSig);
         cmdData.GraphicsLayout = true;
         cmdData.CurrentLayout = info.Layout;
     }
@@ -426,8 +427,8 @@ void
 SetComputeLayout(CommandListData& cmdData, const void* data) {
     const RHICommandBuilder::CmdSetGraphicsLayoutInfo& info{ *(const RHICommandBuilder::CmdSetGraphicsLayoutInfo*)data };
     if (cmdData.CurrentLayout != info.Layout) {
-        ID3D12RootSignature* root_sig{ cmdData.Device->ResolveLayout(info.Layout) };
-        cmdData.List->SetComputeRootSignature(root_sig);
+        cmdData.ResolvedLayout = cmdData.Device->ResolveLayout(info.Layout);
+        cmdData.List->SetComputeRootSignature(cmdData.ResolvedLayout.RootSig);
         cmdData.GraphicsLayout = false;
         cmdData.CurrentLayout = info.Layout;
     }
@@ -480,6 +481,41 @@ SetScissor(CommandListData& cmdData, const void* data) {
 }
 
 void
+SetPushConstants(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdSetPushConstants& info{ *(const RHICommandBuilder::CmdSetPushConstants*)data };
+    if (cmdData.GraphicsLayout) {
+        if (cmdData.ResolvedLayout.NumConstants == 1) {
+            cmdData.List->SetGraphicsRoot32BitConstant(
+                cmdData.ResolvedLayout.NumParams,
+                info.Constants[0],
+                0);
+        }
+        else {
+            cmdData.List->SetGraphicsRoot32BitConstants(
+                cmdData.ResolvedLayout.NumParams,
+                cmdData.ResolvedLayout.NumConstants,
+                &info.Constants[0],
+                0);
+        }
+    }
+    else {
+        if (cmdData.ResolvedLayout.NumConstants == 1) {
+            cmdData.List->SetComputeRoot32BitConstant(
+                cmdData.ResolvedLayout.NumParams,
+                info.Constants[0],
+                0);
+        }
+        else {
+            cmdData.List->SetComputeRoot32BitConstants(
+                cmdData.ResolvedLayout.NumParams,
+                cmdData.ResolvedLayout.NumConstants,
+                &info.Constants[0],
+                0);
+        }
+    }
+}
+
+void
 Draw(CommandListData& cmdData, const void* data) {
     const RHICommandBuilder::CmdDrawInfo& info{ *(const RHICommandBuilder::CmdDrawInfo*)data };
     cmdData.List->DrawInstanced(info.VertexCount, 1, info.BaseVertex, 0);
@@ -515,6 +551,7 @@ constexpr static CommandFunc DispatchTable[RHICommandBuilder::CommandId::Count]{
     SetPrimitiveTopology,
     SetViewport,
     SetScissor,
+    SetPushConstants,
     Draw,
     DrawInstanced,
     DrawIndexed,
@@ -1183,7 +1220,7 @@ CRHIDevice_DX12::CreatePipelineLayout(const PipelineLayoutInitInfo& info,
     {
         D3D12_ROOT_PARAMETER root{};
         root.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-        root.Constants.Num32BitValues = info.PushConstantSize / 4;
+        root.Constants.Num32BitValues = info.PushConstantSize;
         root.Constants.ShaderRegister = 0;
         root.Constants.RegisterSpace = 0;
         root.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
@@ -1236,6 +1273,8 @@ CRHIDevice_DX12::CreatePipelineLayout(const PipelineLayoutInitInfo& info,
     }
 
     m_PipelineLayouts[index].RootSig = root_sig;
+    m_PipelineLayouts[index].NumParams = info.NumParams;
+    m_PipelineLayouts[index].NumConstants = info.PushConstantSize;
     *outHandle = Id::MakeHandle(index, m_PipelineLayouts[index].Generation);
 
     return Result::Ok;
@@ -1250,7 +1289,7 @@ CRHIDevice_DX12::CreateComputePipeline(const ComputePipelineInitInfo& info,
 
     *outHandle = Id::InvalidId;
 
-    ID3D12RootSignature* const root_sig{ ResolveLayout(info.Layout) };
+    ID3D12RootSignature* const root_sig{ ResolveLayout(info.Layout).RootSig };
     if (!(root_sig && info.CS.Blob && info.CS.Size)) {
         return Result::EInvalidarg;
     }
@@ -1313,7 +1352,7 @@ CRHIDevice_DX12::CreateGraphicsPipeline(
 
     *outHandle = Id::InvalidId;
 
-    ID3D12RootSignature* const root_sig{ ResolveLayout(info.Layout) };
+    ID3D12RootSignature* const root_sig{ ResolveLayout(info.Layout).RootSig };
     if (!root_sig) {
         return Result::EInvalidarg;
     }
@@ -1607,16 +1646,16 @@ CRHIDevice_DX12::ResolveResource(RHIResource handle) const {
     return m_DenseResources[slot.DenseIndex].Resource;
 }
 
-ID3D12RootSignature* const
+CRHIDevice_DX12::PipelineLayout
 CRHIDevice_DX12::ResolveLayout(RHIPipelineLayout layout) const {
     u32 index{ Id::Index(layout) };
     u32 gen{ Id::Index(layout) };
 
     const auto& data{ m_PipelineLayouts[index] };
     if (data.Generation != gen)
-        return nullptr;
+        return {};
 
-    return data.RootSig;
+    return data;
 }
 
 ID3D12PipelineState* const

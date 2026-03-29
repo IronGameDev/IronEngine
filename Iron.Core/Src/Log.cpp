@@ -30,6 +30,7 @@ constexpr static const char* g_Errors[Result::Count]{
     "ENotInitialized",
     "EFrameGraph",
     "EShaderError",
+    "EInvalidData",
 };
 
 } // anonymous namespace

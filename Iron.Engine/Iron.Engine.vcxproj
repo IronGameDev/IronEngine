@@ -145,13 +145,17 @@
     <ClCompile Include="Src\Engine.cpp" />
     <ClCompile Include="Src\EngineContext.cpp" />
     <ClCompile Include="Src\Modules\Modules.cpp" />
+    <ClCompile Include="Src\Renderer\PsoBuilder.cpp" />
     <ClCompile Include="Src\Renderer\Renderer.cpp" />
+    <ClCompile Include="Src\Renderer\SceneLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Engine.h" />
     <ClInclude Include="Src\EngineContext.h" />
     <ClInclude Include="Src\Modules\Modules.h" />
+    <ClInclude Include="Src\Renderer\PsoBuilder.h" />
     <ClInclude Include="Src\Renderer\Renderer.h" />
+    <ClInclude Include="Src\Renderer\SceneLoader.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
