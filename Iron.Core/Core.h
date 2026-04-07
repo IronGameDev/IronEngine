@@ -25,6 +25,11 @@ typedef float f32;
 
 typedef u32 TypeId;
 
+constexpr inline u8 max_u8{ (u8)~0 };
+constexpr inline u16 max_u16{ (u16)~0 };
+constexpr inline u32 max_u32{ (u32)~0 };
+constexpr inline u64 max_u64{ (u64)~0 };
+
 struct Version {
     u32 Major : 11;
     u32 Minor : 11;
@@ -688,9 +693,16 @@ private:
 };
 
 namespace Math {
+constexpr static inline f32 PI{ 3.1415926535897932384626433832795f };
+constexpr static inline f32 TwoPI{ 2.f * 3.1415926535897932384626433832795f };
+constexpr static inline f32 HalfPI{ 0.5f * 3.1415926535897932384626433832795f };
+constexpr static inline f32 InvPI{ 1.f / 3.1415926535897932384626433832795f };
 constexpr static inline f32 Inv255{ 1.f / 255.f };
 
 CORE_API f32 SqrtF(f32 Value);
+CORE_API f32 CosF(f32 a);
+CORE_API f32 SinF(f32 a);
+CORE_API f32 TanF(f32 a);
 
 constexpr f32 ConstexprRsqrt(f32 X) noexcept {
     if (X <= 0.0f) return 0.0f;
@@ -978,6 +990,242 @@ constexpr V4 NormalizeConstexpr(const V4& Vv) noexcept {
     const f32 LenSq = LengthSq(Vv);
     if (LenSq == 0.0f) return {};
     return Vv * ConstexprRsqrt(LenSq);
+}
+
+struct M4 {
+    f32 M[4][4];
+
+    constexpr M4() noexcept : M{} {}
+
+    constexpr M4(
+        f32 m00, f32 m01, f32 m02, f32 m03,
+        f32 m10, f32 m11, f32 m12, f32 m13,
+        f32 m20, f32 m21, f32 m22, f32 m23,
+        f32 m30, f32 m31, f32 m32, f32 m33) noexcept
+        :
+        M{
+            {m00,m01,m02,m03},
+            {m10,m11,m12,m13},
+            {m20,m21,m22,m23},
+            {m30,m31,m32,m33}
+        }
+    {
+    }
+
+    static constexpr M4 Identity() noexcept {
+        return {
+            1,0,0,0,
+            0,1,0,0,
+            0,0,1,0,
+            0,0,0,1
+        };
+    }
+};
+
+struct Quat {
+    f32 X, Y, Z, W;
+
+    constexpr Quat() noexcept : X(0), Y(0), Z(0), W(1) {}
+    constexpr Quat(f32 x, f32 y, f32 z, f32 w) noexcept : X(x), Y(y), Z(z), W(w) {}
+};
+
+constexpr M4 operator*(const M4& A, const M4& B) noexcept {
+    M4 R{};
+
+    for (u32 r = 0; r < 4; r++)
+        for (u32 c = 0; c < 4; c++)
+        {
+            R.M[r][c] =
+                A.M[r][0] * B.M[0][c] +
+                A.M[r][1] * B.M[1][c] +
+                A.M[r][2] * B.M[2][c] +
+                A.M[r][3] * B.M[3][c];
+        }
+
+    return R;
+}
+
+constexpr V4 operator*(const V4& Vv, const M4& M) noexcept {
+    return {
+        Vv.X * M.M[0][0] + Vv.Y * M.M[1][0] + Vv.Z * M.M[2][0] + Vv.W * M.M[3][0],
+        Vv.X * M.M[0][1] + Vv.Y * M.M[1][1] + Vv.Z * M.M[2][1] + Vv.W * M.M[3][1],
+        Vv.X * M.M[0][2] + Vv.Y * M.M[1][2] + Vv.Z * M.M[2][2] + Vv.W * M.M[3][2],
+        Vv.X * M.M[0][3] + Vv.Y * M.M[1][3] + Vv.Z * M.M[2][3] + Vv.W * M.M[3][3]
+    };
+}
+
+constexpr M4 Translate(const V3& T) noexcept {
+    return {
+        1,0,0,0,
+        0,1,0,0,
+        0,0,1,0,
+        T.X,T.Y,T.Z,1
+    };
+}
+
+constexpr M4 Scale(const V3& S) noexcept {
+    return {
+        S.X,0,0,0,
+        0,S.Y,0,0,
+        0,0,S.Z,0,
+        0,0,0,1
+    };
+}
+
+inline M4 RotateX(f32 A) noexcept {
+    f32 C{ CosF(A) };
+    f32 S{ SinF(A) };
+
+    return {
+        1,0,0,0,
+        0,C,S,0,
+        0,-S,C,0,
+        0,0,0,1
+    };
+}
+
+inline M4 RotateY(f32 A) noexcept {
+    f32 C{ CosF(A) };
+    f32 S{ SinF(A) };
+
+    return {
+        C,0,-S,0,
+        0,1,0,0,
+        S,0,C,0,
+        0,0,0,1
+    };
+}
+
+inline M4 RotateZ(f32 A) noexcept {
+    f32 C{ CosF(A) };
+    f32 S{ SinF(A) };
+
+    return {
+        C,S,0,0,
+        -S,C,0,0,
+        0,0,1,0,
+        0,0,0,1
+    };
+}
+
+inline M4 LookAtLH(const V3& Eye, const V3& Target, const V3& Up) noexcept {
+    V3 Z{ Normalize(Target - Eye) };
+    V3 X{ Normalize(Cross(Up, Z)) };
+    V3 Y{ Cross(Z, X) };
+
+    return {
+        X.X,Y.X,Z.X,0,
+        X.Y,Y.Y,Z.Y,0,
+        X.Z,Y.Z,Z.Z,0,
+        -Dot(X,Eye),
+        -Dot(Y,Eye),
+        -Dot(Z,Eye),
+        1
+    };
+}
+
+inline M4 PerspectiveLH(f32 FovY, f32 Aspect, f32 NearZ, f32 FarZ) noexcept {
+    f32 H{ 1.0f / TanF(FovY * 0.5f) };
+    f32 W{ H / Aspect };
+
+    M4 R{};
+
+    R.M[0][0] = W;
+    R.M[1][1] = H;
+    R.M[2][2] = FarZ / (FarZ - NearZ);
+    R.M[2][3] = 1.0f;
+    R.M[3][2] = (-NearZ * FarZ) / (FarZ - NearZ);
+
+    return R;
+}
+
+inline M4 OrthoLH(
+    f32 Width,
+    f32 Height,
+    f32 NearZ,
+    f32 FarZ) noexcept {
+    M4 R{};
+
+    R.M[0][0] = 2.0f / Width;
+    R.M[1][1] = 2.0f / Height;
+    R.M[2][2] = 1.0f / (FarZ - NearZ);
+
+    R.M[3][2] = -NearZ / (FarZ - NearZ);
+    R.M[3][3] = 1;
+
+    return R;
+}
+
+inline M4 Rotation(const Quat& Q) noexcept {
+    f32 xx = Q.X * Q.X;
+    f32 yy = Q.Y * Q.Y;
+    f32 zz = Q.Z * Q.Z;
+
+    f32 xy = Q.X * Q.Y;
+    f32 xz = Q.X * Q.Z;
+    f32 yz = Q.Y * Q.Z;
+
+    f32 wx = Q.W * Q.X;
+    f32 wy = Q.W * Q.Y;
+    f32 wz = Q.W * Q.Z;
+
+    return {
+        1 - 2 * (yy + zz),2 * (xy + wz),2 * (xz - wy),0,
+        2 * (xy - wz),1 - 2 * (xx + zz),2 * (yz + wx),0,
+        2 * (xz + wy),2 * (yz - wx),1 - 2 * (xx + yy),0,
+        0,0,0,1
+    };
+}
+
+constexpr Quat operator*(const Quat& A, const Quat& B) noexcept {
+    return {
+        A.W * B.X + A.X * B.W + A.Y * B.Z - A.Z * B.Y,
+        A.W * B.Y - A.X * B.Z + A.Y * B.W + A.Z * B.X,
+        A.W * B.Z + A.X * B.Y - A.Y * B.X + A.Z * B.W,
+        A.W * B.W - A.X * B.X - A.Y * B.Y - A.Z * B.Z
+    };
+}
+
+inline Quat AxisAngle(const V3& Axis, f32 Angle) noexcept {
+    f32 S{ SinF(Angle * 0.5f) };
+
+    return {
+        Axis.X * S,
+        Axis.Y * S,
+        Axis.Z * S,
+        CosF(Angle * 0.5f)
+    };
+}
+
+inline M4 InverseTransform(const M4& M) noexcept {
+    M4 R{};
+
+    R.M[0][0] = M.M[0][0];
+    R.M[0][1] = M.M[1][0];
+    R.M[0][2] = M.M[2][0];
+
+    R.M[1][0] = M.M[0][1];
+    R.M[1][1] = M.M[1][1];
+    R.M[1][2] = M.M[2][1];
+
+    R.M[2][0] = M.M[0][2];
+    R.M[2][1] = M.M[1][2];
+    R.M[2][2] = M.M[2][2];
+
+    V3 T{ M.M[3][0],M.M[3][1],M.M[3][2] };
+
+    V3 TT{
+        -(T.X * R.M[0][0] + T.Y * R.M[1][0] + T.Z * R.M[2][0]),
+        -(T.X * R.M[0][1] + T.Y * R.M[1][1] + T.Z * R.M[2][1]),
+        -(T.X * R.M[0][2] + T.Y * R.M[1][2] + T.Z * R.M[2][2])
+    };
+
+    R.M[3][0] = TT.X;
+    R.M[3][1] = TT.Y;
+    R.M[3][2] = TT.Z;
+    R.M[3][3] = 1;
+
+    return R;
 }
 
 constexpr V2 Xy(const V2& Vv) noexcept { return Vv; }

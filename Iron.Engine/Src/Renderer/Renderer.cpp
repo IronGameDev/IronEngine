@@ -10,13 +10,15 @@ namespace Iron {
 namespace {
 RHIPipelineLayout   layout{};
 RHIPipeline         pso{};
+RHIResource         g_ShaderDataBuffer{};
+RHIResource         g_Positions{};
 
 void
-RenderStuff(RHICommandBuilder& ctx) {
+RenderStuff(RHIGraphicsCommandList& ctx) {
 }
 
 void
-PostProcess(RHICommandBuilder& ctx) {
+PostProcess(RHIGraphicsCommandList& ctx) {
     Viewport vp{ 0.f, 0.f, 1024.f, 768.f, 0.f, 1.f };
     ScissorRect rc{ 0, 0, 1024, 768 };
 
@@ -28,6 +30,13 @@ PostProcess(RHICommandBuilder& ctx) {
 
     float color[4]{ 0.f, 0.f, 1.f, 1.f };
     ctx.SetPushConstants(4, (u32*)&color[0]);
+
+    VertexBufferBinding bind{};
+    bind.Buffer = g_Positions;
+    bind.Offset = 0;
+    bind.Stride = sizeof(Math::V3);
+
+    ctx.SetVertexBuffers(0, 1, &bind);
 
     ctx.Draw(3, 0);
 }
@@ -80,6 +89,34 @@ SetupRenderer(RHIGraphBuilder& builder) {
     builder.Read(color, RHIFormat::R8G8B8A8_UNORM, ResourceState::PixelResource, 1);
     builder.WriteClear(bb, RHIFormat::R8G8B8A8_UNORM, ResourceState::RenderTarget, 0, { 0.f, 0.7f, 0.f, 1.f });
     builder.EndPass();
+}
+
+void
+TempCreateTriBuffer(IRHIDevice* const device) {
+    ResourceInitInfo info{};
+    info.Dimension = ResourceDimension::Buffer;
+    info.Width = sizeof(Math::V3) * 3;
+    info.Height = 1;
+    info.DepthOrArray = 1;
+    info.StructuredStride = sizeof(Math::V3);
+    info.MipLevels = 1;
+    info.Format = RHIFormat::UNKNOWN;
+    info.Usage = ResourceUsage::Dynamic;
+    info.CPURead = false;
+    info.CPUWrite = true;
+    info.Flags = ResourceFlags::BindVertexBuffer;
+
+    device->CreateResource(info, &g_Positions);
+
+    Math::V3* positions{};
+
+    device->MapResource(g_Positions, 0, MapType::WriteDiscard, (void**)&positions);
+
+    positions[0] = { -1.f, 0.5f, 0.f };
+    positions[1] = { 0.f, -1.f, 0.f };
+    positions[2] = { 1.f, 0.5f, 0.f };
+
+    device->UnmapResource(g_Positions, 0);
 }
 }//anonymous namespace
 
@@ -171,38 +208,24 @@ RenderContext::InitializeForWindow(Window::IWindow* const window) {
     }
 
     ResourceInitInfo info{};
-    info.Dimension = ResourceDimension::Buffer;
+    info.Dimension = ResourceDimension::Texture2D;
     info.Width = 1024;
-    info.Height = 1;
+    info.Height = 1024;
     info.DepthOrArray = 1;
     info.StructuredStride = 0;
     info.MipLevels = 1;
-    info.Format = RHIFormat::UNKNOWN;
+    info.Format = RHIFormat::R8G8B8A8_UNORM;
     info.Usage = ResourceUsage::Default;
     info.CPURead = false;
-    info.CPUWrite = true;
-    info.Flags = ResourceFlags::AllowShaderResource;
+    info.CPUWrite = false;
+    info.Flags = ResourceFlags::None;
 
-    RHIResource resss[3]{};
-
+    RHIResource resss[1]{};
     m_Device->CreateResource(info, &resss[0]);
 
     m_Device->DestroyResource(resss[0]);
 
-    m_Device->CreateResource(info, &resss[0]);
-    m_Device->CreateResource(info, &resss[1]);
-    m_Device->CreateResource(info, &resss[2]);
-    m_Device->DestroyResource(resss[0]);
-    m_Device->DestroyResource(resss[1]);
-
-    m_Device->CreateResource(info, &resss[0]);
-
-    m_Device->DestroyResource(resss[2]);
-    m_Device->DestroyResource(resss[0]);
-
-    m_Device->CreateResource(info, &resss[0]);
-    m_Device->DestroyResource(resss[0]);
-
+    TempCreateTriBuffer(m_Device);
 
     PipelineLayoutParam params[1]{};
     params[0].AsSRV(0, 0);
@@ -230,6 +253,9 @@ RenderContext::InitializeForWindow(Window::IWindow* const window) {
         ReadFile("D:\\code\\IronEngine\\EngineAssets\\D3D11\\Bin\\ColorPS.bin", ps_blob, ps_size);
     }
 
+    if (!(vs_blob && ps_blob))
+        return Result::EInvalidData;
+
     //TODO: WHATTT
     pso_info.VS.Blob = vs_blob + sizeof(u32);
     pso_info.VS.Size = vs_size - sizeof(u32);
@@ -239,6 +265,18 @@ RenderContext::InitializeForWindow(Window::IWindow* const window) {
     pso_info.NumTargets = 1;
     pso_info.DepthStencil.DepthEnable = false;
     pso_info.Rasterizer.Cull = CullMode::None;
+
+    PipelineInputElementInitInfo elements[1]{};
+    elements[0].Name = "POS";
+    elements[0].Index = 0;
+    elements[0].Format = RHIFormat::R32G32B32_FLOAT;
+    elements[0].InputSlot = 0;
+    elements[0].AlignedOffset = 0;
+    elements[0].Rate = InputRate::PerVertex;
+    elements[0].InstanceStepRate = 0;
+
+    pso_info.InputAssembler.Elements = &elements[0];
+    pso_info.InputAssembler.NumElements = 1;
 
     m_Device->CreateGraphicsPipeline(pso_info, &pso);
 
@@ -255,7 +293,7 @@ RenderContext::InitializeForWindow(Window::IWindow* const window) {
 
 void
 RenderContext::Release() {
-    m_FrameGraph->WaitIdle();
+    m_Device->DestroyResource(g_Positions);
 
     m_Device->DestroyPipelineLayout(layout);
     m_Device->DestroyPipeline(pso);

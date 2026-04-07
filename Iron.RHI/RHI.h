@@ -82,6 +82,27 @@ public:
     virtual void GetFeatures(
         DeviceFeatures* features) = 0;
 
+    virtual Result::Code MapResource(
+        RHIResource resource,
+        u32 subresource,
+        MapType::Type type,
+        void** data) const = 0;
+
+    virtual void UnmapResource(
+        RHIResource resource,
+        u32 subresource) const = 0;
+
+    virtual u64 CopySubmitList(
+        RHICopyCommandList& list) = 0;
+
+    virtual void CopyWaitFence(
+        u64 fenceValue) = 0;
+
+    virtual void CopySubmitAndWait(
+        RHICopyCommandList& list) = 0;
+
+    virtual void WaitAllCommands() = 0;
+
     virtual void* const GetNative() const = 0;
 };
 
@@ -101,8 +122,6 @@ public:
     virtual void Execute(
         IRHISurface* const surface,
         u64 frameNumber) = 0;
-
-    virtual void WaitIdle() = 0;
 };
 
 //TODO: Rework for better clarity

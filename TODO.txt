@@ -1,8 +1,8 @@
  -  Make RHISurface use native window* instead of Windowing interface
     ->Causes RHI to depend on Windowing.dll
- -  Disabling GPU timeout should work for both framegraph and non-framegraph workloads
  -  Fix loading engine api's (GetEngineAPI())
- -  D3D11 Push constants?
  -  RHI Check no more remaining resources after shutdown
  -  RHI Blend factor
  -  RHI Rework pipeline binding logic for graphics/compute workloads
+ -  RHI FrameGraph subresources + builder allocations
+ -  RHI Validate resource creation - should not rw to default resource!

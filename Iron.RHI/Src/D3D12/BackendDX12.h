@@ -1,4 +1,5 @@
 #include <Iron.RHI/RHI.h>
+#include <Iron.RHI/Src/DXGIShared/Shared.h>
 
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -8,6 +9,8 @@
 #include <deque>
 
 namespace Iron::RHI::D3D12 {
+class CRHISurface_DX12;
+
 constexpr static u64 Alignment64KB{ 1 << 16 };
 constexpr static u64 Alignment4MB{ 1 << 22 };
 
@@ -306,6 +309,67 @@ private:
     u32                     m_Current{};
 };
 
+class DX12CommandManager {
+public:
+    struct Context {
+        ID3D12GraphicsCommandList10*    List{};
+        ID3D12CommandAllocator*         Alloc{};
+
+        void Reset() {
+            Alloc->Reset();
+            List->Reset(Alloc, nullptr);
+        }
+    };
+
+    bool Initialize(ID3D12Device14* const device,
+        D3D12_COMMAND_LIST_TYPE type,
+        bool gpuTimeOut = false);
+
+    void Release();
+
+    Context Get();
+
+    u64 Submit(Context* contexts,
+        u32 count,
+        CRHISurface_DX12* const surface,
+        bool vsync = true);
+
+    void Wait(u64 fenceValue);
+
+    void WaitAll() {
+        Wait(m_FenceValue);
+    }
+
+    ID3D12CommandQueue* const GetQueue() const {
+        return m_Queue;
+    }
+
+private:
+    void ReclaimCompleted();
+    Context CreateContext();
+
+    inline bool FenceCompleted(u64 fenceValue) const {
+        return m_Fence->GetCompletedValue() >= fenceValue;
+    }
+
+    ID3D12Device14*                             m_Device{ nullptr };
+
+    struct PushedList {
+        Context                                 Ctx{};
+        u64                                     Value{};
+    };
+
+    D3D12_COMMAND_LIST_TYPE                     m_Type{};
+    ID3D12CommandQueue*                         m_Queue{ nullptr };
+    ID3D12Fence*                                m_Fence{ nullptr };
+    HANDLE                                      m_FenceEvent{};
+    u64                                         m_FenceValue{};
+
+    std::vector<Context>                        m_AvailCtx{};
+    std::vector<PushedList>                     m_InFlight{};
+
+};
+
 class CRHIDevice_DX12 : public IRHIDevice {
 public:
     struct ResourceSlot {
@@ -314,9 +378,10 @@ public:
     };
 
     struct DenseResource {
-        u32                 SparseIndex{};
-        HeapAllocInfo       Info{};
-        ID3D12Resource*     Resource{};
+        u32                         SparseIndex{};
+        ID3D12Resource*             Resource{};
+        D3D12_GPU_VIRTUAL_ADDRESS   Address{};
+        u32                         RowPitch{};//Buffer only
     };
 
     struct PipelineLayout {
@@ -379,14 +444,43 @@ public:
     void GetFeatures(
         DeviceFeatures* features) override;
 
-    void* const GetNative() const override;
+    Result::Code MapResource(
+        RHIResource resource,
+        u32 subresource,
+        MapType::Type type,
+        void** data) const override;
 
-    inline ID3D12CommandQueue* const GetGraphicsQueue() const {
-        return m_GraphicsQueue;
-    }
+    void UnmapResource(
+        RHIResource resource,
+        u32 subresource) const override;
+
+    u64 CopySubmitList(
+        RHICopyCommandList& list) override;
+
+    void CopyWaitFence(
+        u64 fenceValue) override;
+
+    void CopySubmitAndWait(
+        RHICopyCommandList& list) override;
+
+    void WaitAllCommands() override;
+
+    void* const GetNative() const override;
 
     DX12DescriptorHeap& GetSrvHeap() {
         return m_SrvHeap;
+    }
+
+    DX12CommandManager& GetGraphics() {
+        return m_GraphicsMgr;
+    }
+
+    DX12CommandManager& GetCompute() {
+        return m_ComputeMgr;
+    }
+
+    DX12CommandManager& GetCopy() {
+        return m_CopyMgr;
     }
 
     template<typename T>
@@ -406,15 +500,24 @@ public:
         return data;
     }
 
-    ID3D12Resource* const ResolveResource(RHIResource handle) const;
+    DenseResource ResolveResource(RHIResource handle) const;
     PipelineLayout ResolveLayout(RHIPipelineLayout layout) const;
     ID3D12PipelineState* const ResolvePso(RHIPipeline pso) const;
+
+    constexpr bool IsDebug() const {
+        return m_Debug;
+    }
+
+    constexpr bool DisabledGPUTimeout() const {
+        return m_DisableGPUTimeout;
+    }
 
 private:
     D3D_FEATURE_LEVEL _GetMaximumFL(IUnknown* const adapter) const;
 
     IRHIFactory*                                    m_Factory;
     bool                                            m_Debug;
+    bool                                            m_DisableGPUTimeout;
 
     HMODULE                                         m_D3D12Dll;
     PFN_D3D12_CREATE_DEVICE                         m_D3D12CreateDevice;
@@ -424,10 +527,11 @@ private:
     DeviceFeatures                                  m_Features;
 
     ID3D12Device14*                                 m_Device;
-    ID3D12CommandQueue*                             m_GraphicsQueue;
 
-    DX12BuddyAllocator                              m_BufferHeaps;
-    DX12DescriptorHeap                              m_SrvHeap;
+    DX12DescriptorHeap                              m_SrvHeap{};
+    DX12CommandManager                              m_GraphicsMgr{};
+    DX12CommandManager                              m_ComputeMgr{};
+    DX12CommandManager                              m_CopyMgr{};
 
     Vector<ResourceSlot>                            m_SparseResources;
     Vector<DenseResource>                           m_DenseResources;
@@ -552,112 +656,6 @@ class CRHIFrameGraph_DX12 : public IRHIFrameGraph {
         }
     };
 
-    struct CommandQueue {
-        constexpr static u32 BufferCount{ 3 };
-
-        struct Frame {
-            ID3D12CommandAllocator*     Alloc;
-            u64                         FenceValue;
-
-            void Wait(ID3D12Fence* const fence, HANDLE fenceEvent) {
-                if (fence->GetCompletedValue() < FenceValue) {
-                    fence->SetEventOnCompletion(FenceValue, fenceEvent);
-                    WaitForSingleObject(fenceEvent, INFINITE);
-                }
-            }
-        };
-
-        Result::Code Initialize(
-            ID3D12Device14* const device,
-            ID3D12CommandQueue* const queue,
-            D3D12_COMMAND_LIST_TYPE type) {
-            if (!(device && queue)) {
-                return Result::EInvalidarg;
-            }
-
-            Queue = queue;
-
-            HRESULT hr{ S_OK };
-            for (u32 i{ 0 }; i < BufferCount; ++i) {
-                hr = device->CreateCommandAllocator(type, IID_PPV_ARGS(&Frames[i].Alloc));
-                if (FAILED(hr)) {
-                    return Result::ECreateRHIObject;
-                }
-            }
-
-            hr = device->CreateCommandList(0, type, Frames[0].Alloc, nullptr, IID_PPV_ARGS(&List));
-            if (FAILED(hr)) {
-                return Result::ECreateRHIObject;
-            }
-
-            hr = device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&Fence));
-            if (FAILED(hr)) {
-                return Result::ECreateRHIObject;
-            }
-
-            FenceEvent = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
-            if (FAILED(hr)) {
-                return Result::ECreateResource;
-            }
-
-            List->Close();
-
-            return Result::Ok;
-        }
-
-        void Release() {
-            Flush();
-
-            SafeRelease(List);
-
-            for (u32 i{ 0 }; i < BufferCount; ++i) {
-                SafeRelease(Frames[i].Alloc);
-            }
-
-            SafeRelease(Fence);
-            CloseHandle(FenceEvent);
-        }
-
-        void Begin() {
-            Frame& frame{ Frames[FrameIndex] };
-            frame.Wait(Fence, FenceEvent);
-            frame.Alloc->Reset();
-            List->Reset(frame.Alloc, nullptr);
-        }
-
-        void End(CRHISurface_DX12* const surface) {
-            List->Close();
-            ID3D12CommandList* const lists[]{ List };
-            Queue->ExecuteCommandLists(_countof(lists), &lists[0]);
-
-            const u64 fence_value{ ++FenceValue };
-            Frame& frame{ Frames[FrameIndex] };
-            frame.FenceValue = fence_value;
-
-            Queue->Signal(Fence, fence_value);
-            
-            surface->Present();
-
-            FrameIndex = (FrameIndex + 1) % BufferCount;
-        }
-
-        void Flush() {
-            for (u32 i{ 0 }; i < BufferCount; ++i) {
-                Frames[i].Wait(Fence, FenceEvent);
-            }
-
-            FrameIndex = 0;
-        }
-
-        ID3D12CommandQueue*             Queue{};
-        ID3D12GraphicsCommandList10*    List{};
-        ID3D12Fence*                    Fence{};
-        u64                             FenceValue{};
-        HANDLE                          FenceEvent{};
-        Frame                           Frames[BufferCount]{};
-        u32                             FrameIndex{};
-    };
-
     struct MemoryHeap {
         Result::Code Initialize(
             ID3D12Device14* const device,
@@ -711,8 +709,6 @@ public:
         IRHISurface* const surface,
         u64 frameNumber) override;
 
-    void WaitIdle() override;
-
 private:
     Vector<Vector<u32>> GetDependencies(const RHIGraphBuilder& builder) const;
     Vector<u32> TopologicalSort(const Vector<Vector<u32>>& dependencies) const;
@@ -730,7 +726,6 @@ private:
     Vector<View>                        m_DescViews{};
     Vector<ID3D12Resource*>             m_Resources{};
 
-    CommandQueue                        m_Queue{};
     MemoryHeap                          m_Heap{};
     DX12DescriptorHeap                  m_RtvHeap{};
     DX12DescriptorHeap                  m_DsvHeap{};

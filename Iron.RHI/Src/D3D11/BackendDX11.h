@@ -1,4 +1,5 @@
 #include <Iron.RHI/RHI.h>
+#include <Iron.RHI/Src/DXGIShared/Shared.h>
 
 #include <d3d11_4.h>
 #include <dxgi1_6.h>
@@ -50,6 +51,12 @@ template<>
 struct D3D11FeatureTraits<D3D11_FEATURE_DATA_D3D11_OPTIONS6> {
     static constexpr D3D11_FEATURE Feature = D3D11_FEATURE_D3D11_OPTIONS6;
     static void PreQuery(D3D11_FEATURE_DATA_D3D11_OPTIONS6&) {}
+};
+
+template<>
+struct D3D11FeatureTraits<D3D11_FEATURE_DATA_THREADING> {
+    static constexpr D3D11_FEATURE Feature = D3D11_FEATURE_THREADING;
+    static void PreQuery(D3D11_FEATURE_DATA_THREADING&) {}
 };
 
 class CRHIDevice_DX11 : public IRHIDevice {
@@ -130,6 +137,15 @@ public:
             handle.Ptr = nullptr;
         }
 
+        void Clear() {
+            for (auto& ptr : m_Data) {
+                SafeRelease(ptr.Ptr);
+            }
+
+            m_Data.Clear();
+            m_HashMap.clear();
+        }
+
     private:
         struct Item {
             T*                  Ptr;
@@ -154,6 +170,7 @@ public:
         PsoHandle<ID3D11DomainShader>       DS;
         PsoHandle<ID3D11HullShader>         HS;
         PsoHandle<ID3D11GeometryShader>     GS;
+        PsoHandle<ID3D11InputLayout>        IL;
         PsoHandle<ID3D11BlendState1>        Blend;
         PsoHandle<ID3D11RasterizerState2>   Rasterizer;
         PsoHandle<ID3D11DepthStencilState>  Depth;
@@ -212,6 +229,31 @@ public:
     void GetFeatures(
         DeviceFeatures* features) override;
 
+    Result::Code MapResource(
+        RHIResource resource,
+        u32 subresource,
+        MapType::Type type,
+        void** data) const override;
+
+    void UnmapResource(
+        RHIResource resource,
+        u32 subresource) const override;
+
+    u64 CopySubmitList(
+        RHICopyCommandList& list) override {
+        return 0;
+    }
+
+    void CopyWaitFence(
+        u64 fenceValue) override {
+    }
+
+    void CopySubmitAndWait(
+        RHICopyCommandList& list) override {
+    }
+
+    void WaitAllCommands() override {}
+
     void* const GetNative() const override;
 
     constexpr ID3D11DeviceContext4* const GetContext() const {
@@ -235,7 +277,7 @@ public:
         return data;
     }
 
-    ID3D11Resource* const ResolveResource(RHIResource handle) const;
+    const DenseResource ResolveResource(RHIResource handle) const;
     const PipelineData ResolvePipelineData(RHIPipeline pso) const;
     const PipelineLayout ResolvePipelineLayout(RHIPipelineLayout layout) const;
     const GraphicsPipeline ResolveGraphicsPipeline(const PipelineData& data) const;
@@ -284,6 +326,7 @@ private:
     RefCountedStorage<ID3D11DomainShader>       m_DomainShaders;
     RefCountedStorage<ID3D11GeometryShader>     m_GeometryShaders;
     RefCountedStorage<ID3D11HullShader>         m_HullShaders;
+    RefCountedStorage<ID3D11InputLayout>        m_InputLayouts;
     RefCountedStorage<ID3D11BlendState1>        m_BlendStates;
     RefCountedStorage<ID3D11RasterizerState2>   m_RasterStates;
     RefCountedStorage<ID3D11DepthStencilState>  m_DepthStates;
@@ -400,8 +443,6 @@ public:
     void Execute(
         IRHISurface* const surface,
         u64 frameNumber) override;
-
-    void WaitIdle() override {}
 
 private:
     Vector<Vector<u32>> GetDependencies(const RHIGraphBuilder& builder) const;

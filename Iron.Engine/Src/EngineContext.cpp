@@ -154,6 +154,8 @@ EngineContext::Run(const EngineInitInfo& Info, Application* const App)
             m_MainWindow->SetFullscreen(!m_MainWindow->IsFullscreen());
             Sleep(200);
         }
+
+        Sleep(5);
     }
 
     App->Shutdown();

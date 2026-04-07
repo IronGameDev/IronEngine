@@ -15,6 +15,8 @@ All functional interfaces should only be defined in RHI.h
 #define RHI_MAX_VIEWS_PER_TYPE (1 << RHI_VIEW_INDEX_BITS) - 1
 #define RHI_MAX_TARGET_COUNT 8
 #define RHI_MAX_PUSH_CONSTANTS_IN_32BIT 32
+#define RHI_MAX_CONTEXT_PER_SUBMIT 8
+#define RHI_MAX_IA_VERTEX_ELEMENTS 32
 #define RHI_TEMPORAL_COUNT_BITS 4
 #define RHI_VIEW_INDEX_BITS 12
 #define RHI_COMMAND_ALIGN 8
@@ -35,13 +37,16 @@ typedef TypeId RHIResource;
 typedef TypeId RHIPipeline;
 typedef TypeId RHIPipelineLayout;
 class RHICommandBuilder;
+class RHICopyCommandList;
+class RHIComputeCommandList;
+class RHIGraphicsCommandList;
 class RHIGraphBuilder;
 class IRHIAdapter;
 class IRHIDevice;
 class IRHISurface;
 class IRHIFrameGraph;
 
-typedef void(*FGPassFunc)(RHICommandBuilder&);
+typedef void(*FGPassFunc)(RHIGraphicsCommandList&);
 
 struct RHIBackend {
     enum Value : u32 {
@@ -217,11 +222,12 @@ struct ResourceUsage {
 struct ResourceFlags {
     enum Flags : u32 {
         None = 0x00,
-        AllowShaderResource = 0x01,
+        DenyShaderResource = 0x01,
         BindVertexBuffer = 0x02,
         BindIndexBuffer = 0x04,
-        TextureCube = 0x08,
-        Structured = 0x10,
+        BindConstantBuffer = 0x08,
+        TextureCube = 0x10,
+        Structured = 0x20,
     };
 };
 
@@ -401,6 +407,16 @@ struct PrimitiveTopology {
     };
 };
 
+struct MapType {
+    enum Type : u32 {
+        Read = 0,
+        Write,
+        ReadWrite,
+        WriteDiscard,
+        WriteNoOverWrite,
+    };
+};
+
 struct FGResourceType {
     enum Type : u32 {
         Texture = 0,
@@ -438,6 +454,7 @@ struct DeviceInitInfo {
 struct DeviceFeatures {
     bool                Bindless : 1;
     bool                PushConstants : 1;
+    bool                PersistentMapping : 1;
     Version             ShaderModel;
     Version             FeatureLevel;
 };
@@ -504,6 +521,12 @@ struct ClearValue {
         f32                         Color[4];
         DepthStencilClear           Depth;
     };
+};
+
+struct VertexBufferBinding {
+    RHIResource                     Buffer;
+    u32                             Offset;
+    u32                             Stride;
 };
 
 struct PipelineLayoutParam {
@@ -794,6 +817,7 @@ public:
             SetViewports,
             SetScissors,
             SetPushConstants,
+            SetVertexBuffers,
             Draw,
             DrawInstanced,
             DrawIndexed,
@@ -838,8 +862,14 @@ public:
         u32                     Count;
     };
 
-    struct CmdSetPushConstants {
+    struct CmdSetPushConstantsInfo {
         u32                     Constants[RHI_MAX_PUSH_CONSTANTS_IN_32BIT];
+    };
+
+    struct CmdSetVertexBuffersInfo {
+        u32                     StartSlot{};
+        u32                     NumBuffers{};
+        VertexBufferBinding     Bindings[RHI_MAX_IA_VERTEX_ELEMENTS];
     };
 
     struct CmdDrawInfo {
@@ -926,6 +956,13 @@ public:
         return m_Capacity;
     }
 
+private:
+    u8*         m_Stream;
+    u32         m_Offset;
+    u32         m_Capacity;
+};
+
+class RHICopyCommandList : public RHICommandBuilder {
 public:
     inline void CopyResource(RHIResource Src,
         RHIResource Dst) {
@@ -934,13 +971,10 @@ public:
         cmd->Src = Src;
         cmd->Dst = Dst;
     }
+};
 
-    inline void SetGraphicsLayout(RHIPipelineLayout layout) {
-        auto* cmd{ Allocate<CmdSetGraphicsLayoutInfo>(CommandId::SetGraphicsLayout) };
-        RHI_VALIDATE_CMD(cmd);
-        cmd->Layout = layout;
-    }
-
+class RHIComputeCommandList : public RHICopyCommandList {
+public:
     inline void SetComputeLayout(RHIPipelineLayout layout) {
         auto* cmd{ Allocate<CmdSetComputeLayoutInfo>(CommandId::SetComputeLayout) };
         RHI_VALIDATE_CMD(cmd);
@@ -951,6 +985,24 @@ public:
         auto* cmd{ Allocate<CmdSetPipelineInfo>(CommandId::SetPipeline) };
         RHI_VALIDATE_CMD(cmd);
         cmd->Pso = pso;
+    }
+
+    inline void SetPushConstants(u32 numConstants, u32* const constants) {
+        auto* cmd{ Allocate<CmdSetPushConstantsInfo>(CommandId::SetPushConstants) };
+        RHI_VALIDATE_CMD(cmd);
+        MemSet(cmd->Constants, 0x00, RHI_MAX_PUSH_CONSTANTS_IN_32BIT * sizeof(u32));
+        for (u32 i{ 0 }; i < Math::Min(numConstants, (u32)RHI_MAX_PUSH_CONSTANTS_IN_32BIT); ++i) {
+            cmd->Constants[i] = constants[i];
+        }
+    }
+};
+
+class RHIGraphicsCommandList : public RHIComputeCommandList {
+public:
+    inline void SetGraphicsLayout(RHIPipelineLayout layout) {
+        auto* cmd{ Allocate<CmdSetGraphicsLayoutInfo>(CommandId::SetGraphicsLayout) };
+        RHI_VALIDATE_CMD(cmd);
+        cmd->Layout = layout;
     }
 
     inline void SetPrimitiveTopology(PrimitiveTopology::Val topology) {
@@ -977,12 +1029,15 @@ public:
         }
     }
 
-    inline void SetPushConstants(u32 numConstants, u32* const constants) {
-        auto* cmd{ Allocate<CmdSetPushConstants>(CommandId::SetPushConstants) };
+    inline void SetVertexBuffers(u32 startSlot,
+    u32 numBuffers,
+    VertexBufferBinding* bindings) {
+        auto* cmd{ Allocate<CmdSetVertexBuffersInfo>(CommandId::SetVertexBuffers) };
         RHI_VALIDATE_CMD(cmd);
-        MemSet(cmd->Constants, 0x00, RHI_MAX_PUSH_CONSTANTS_IN_32BIT * sizeof(u32));
-        for (u32 i{ 0 }; i < Math::Min(numConstants, (u32)RHI_MAX_PUSH_CONSTANTS_IN_32BIT); ++i) {
-            cmd->Constants[i] = constants[i];
+        cmd->StartSlot = startSlot;
+        cmd->NumBuffers = numBuffers;
+        for (u32 i{ 0 }; i < numBuffers; ++i) {
+            cmd->Bindings[i] = bindings[i];
         }
     }
 
@@ -1029,10 +1084,5 @@ public:
         cmd->BaseVertex = BaseVertex;
         cmd->BaseInstance = BaseInstance;
     }
-
-private:
-    u8*         m_Stream;
-    u32         m_Offset;
-    u32         m_Capacity;
 };
 }

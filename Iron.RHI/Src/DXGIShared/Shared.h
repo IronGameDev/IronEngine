@@ -7,7 +7,7 @@
 #define LOG_HR(hr) LOG_ERROR(Iron::RHI::Shared::HrToString(hr));
 
 namespace Iron::RHI::Shared {
-static const char* HrToString(HRESULT hr) {
+inline const char* HrToString(HRESULT hr) {
     static char buffer[512];
 
     FormatMessageA(
@@ -23,7 +23,7 @@ static const char* HrToString(HRESULT hr) {
     return buffer;
 }
 
-static u64
+inline u64
 HashBytes(const void* data, size_t size, u64 hash = 1469598103934665603ull) {
     if (!data) return hash;
 
@@ -36,12 +36,12 @@ HashBytes(const void* data, size_t size, u64 hash = 1469598103934665603ull) {
 }
 
 template<typename T>
-static u64
+inline u64
 HashStruct(const T& s, u64 hash) {
     return HashBytes(&s, sizeof(T), hash);
 }
 
-static u64
+inline u64
 HashShaderBytecode(const RHIBlob& bc, u64 hash) {
     hash = HashBytes(&bc.Size, sizeof(bc.Size), hash);
     if (bc.Blob && bc.Size > 0) {

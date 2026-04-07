@@ -1,5 +1,4 @@
 #include <Iron.RHI/Src/D3D11/BackendDX11.h>
-#include <Iron.RHI/Src/Shared/Shared.h>
 
 #include <wrl.h>
 #include <unordered_map>
@@ -33,9 +32,10 @@ ConvertUsage(ResourceUsage::Usage usage) {
 constexpr u32
 ConvertResourceBindFlags(ResourceFlags::Flags flags) {
     u32 value{ 0 };
-    if (flags & ResourceFlags::AllowShaderResource) value |= D3D11_BIND_SHADER_RESOURCE;
+    if (!(flags & ResourceFlags::DenyShaderResource)) value |= D3D11_BIND_SHADER_RESOURCE;
     if (flags & ResourceFlags::BindVertexBuffer) value |= D3D11_BIND_VERTEX_BUFFER;
     if (flags & ResourceFlags::BindIndexBuffer) value |= D3D11_BIND_INDEX_BUFFER;
+    if (flags & ResourceFlags::BindConstantBuffer) value |= D3D11_BIND_CONSTANT_BUFFER;
 
     return value;
 }
@@ -214,6 +214,24 @@ ConvertStencilOp(StencilOp::Op op) {
     }
 }
 
+constexpr D3D11_MAP
+ConvertMapType(MapType::Type type) {
+    switch (type)
+    {
+    case MapType::Read:
+        return D3D11_MAP_READ;
+    case MapType::Write:
+        return D3D11_MAP_WRITE;
+    case MapType::ReadWrite:
+        return D3D11_MAP_READ_WRITE;
+    case MapType::WriteDiscard:
+        return D3D11_MAP_WRITE_DISCARD;
+    case MapType::WriteNoOverWrite:
+        return D3D11_MAP_WRITE_NO_OVERWRITE;
+    default:
+        return D3D11_MAP_READ_WRITE;
+    }
+}
 
 inline void SetDebugName(ID3D11DeviceChild* object, const char* name) {
 #if defined(_DEBUG)
@@ -254,6 +272,7 @@ struct CommandListData {
     ID3D11DomainShader*             CurrentDS{};
     ID3D11HullShader*               CurrentHS{};
     ID3D11GeometryShader*           CurrentGS{};
+    ID3D11InputLayout*              CurrentIL{};
     ID3D11BlendState1*              CurrentBlend{};
     ID3D11RasterizerState2*         CurrentRaster{};
     ID3D11DepthStencilState*        CurrentDepth{};
@@ -340,9 +359,9 @@ typedef void(*CommandFunc)(CommandListData&, const void*);
 void
 CopyResource(CommandListData& cmdData, const void* data) {
     const RHICommandBuilder::CmdCopyResourceInfo& info{ *(const RHICommandBuilder::CmdCopyResourceInfo*)data };
-    ID3D11Resource* const src{ cmdData.Device->ResolveResource(info.Src) };
-    ID3D11Resource* const dst{ cmdData.Device->ResolveResource(info.Dst) };
-    cmdData.Ctx->CopyResource(dst, src);
+    const CRHIDevice_DX11::DenseResource& src{ cmdData.Device->ResolveResource(info.Src) };
+    const CRHIDevice_DX11::DenseResource& dst{ cmdData.Device->ResolveResource(info.Dst) };
+    cmdData.Ctx->CopyResource(dst.Resource, src.Resource);
 }
 
 void
@@ -412,6 +431,10 @@ SetPipeline(CommandListData& cmdData, const void* data) {
             cmdData.Ctx->OMSetDepthStencilState(pso.Depth.Ptr, 0);
             cmdData.CurrentDepth = pso.Depth.Ptr;
         }
+        if (pso.IL.Ptr != cmdData.CurrentIL) {
+            cmdData.Ctx->IASetInputLayout(pso.IL.Ptr);
+            cmdData.CurrentIL = pso.IL.Ptr;
+        }
     }
     else {
         const CRHIDevice_DX11::ComputePipeline& pso{ cmdData.Device->ResolveComputePipeline(pso_data) };
@@ -461,7 +484,7 @@ SetScissor(CommandListData& cmdData, const void* data) {
 
 void
 SetPushConstants(CommandListData& cmdData, const void* data) {
-    const RHICommandBuilder::CmdSetPushConstants& info{ *(const RHICommandBuilder::CmdSetPushConstants*)data };
+    UNREFERENCED_PARAMETER(data);
     const u32 rounded{ ((cmdData.Layout.PCSize + 15) / 16) * 16 };
     u32& offset{ cmdData.PC.Offset };
 
@@ -520,6 +543,30 @@ SetPushConstants(CommandListData& cmdData, const void* data) {
 }
 
 void
+SetVertexBuffers(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdSetVertexBuffersInfo& info{ *(const RHICommandBuilder::CmdSetVertexBuffersInfo*)data };
+
+    ID3D11Buffer* buffers[RHI_MAX_IA_VERTEX_ELEMENTS]{};
+    u32 offsets[RHI_MAX_IA_VERTEX_ELEMENTS]{};
+    u32 strides[RHI_MAX_IA_VERTEX_ELEMENTS]{};
+
+    for (u32 i{ 0 }; i < info.NumBuffers; ++i) {
+        const VertexBufferBinding& b{ info.Bindings[i] };
+        const CRHIDevice_DX11::DenseResource& ptr{ cmdData.Device->ResolveResource(b.Buffer) };
+
+        buffers[i] = (ID3D11Buffer*)ptr.Resource;
+        offsets[i] = b.Offset;
+        strides[i] = b.Stride;
+    }
+
+    cmdData.Ctx->IASetVertexBuffers(info.StartSlot,
+        info.NumBuffers,
+        &buffers[0],
+        &strides[0],
+        &offsets[0]);
+}
+
+void
 Draw(CommandListData& cmdData, const void* data) {
     const RHICommandBuilder::CmdDrawInfo& info{ *(const RHICommandBuilder::CmdDrawInfo*)data };
     cmdData.Ctx->Draw(info.VertexCount, info.BaseVertex);
@@ -556,6 +603,7 @@ constexpr static CommandFunc DispatchTable[RHICommandBuilder::CommandId::Count]{
     SetViewport,
     SetScissor,
     SetPushConstants,
+    SetVertexBuffers,
     Draw,
     DrawInstanced,
     DrawIndexed,
@@ -583,7 +631,7 @@ ParseCommandStream(RHICommandBuilder& builder, CommandListData& cmdData) {
             stream += sizeof(RHICommandBuilder::CmdHeader);
 
             if (header.Id == RHICommandBuilder::CommandId::SetPushConstants) {
-                const RHICommandBuilder::CmdSetPushConstants& info{ *(const RHICommandBuilder::CmdSetPushConstants*)stream };
+                const RHICommandBuilder::CmdSetPushConstantsInfo& info{ *(const RHICommandBuilder::CmdSetPushConstantsInfo*)stream };
 
                 u8* const map_ptr{ (u8*)cmdData.PC.Map.pData };
 
@@ -694,6 +742,7 @@ CRHIDevice_DX11::CRHIDevice_DX11(
     D3D11_FEATURE_DATA_D3D11_OPTIONS d3d11_options{ QueryFeatureSupport<D3D11_FEATURE_DATA_D3D11_OPTIONS>() };
 
     m_Features.Bindless = false;
+    m_Features.PersistentMapping = false;
     m_Features.PushConstants = d3d11_options.ConstantBufferPartialUpdate & d3d11_options.ConstantBufferOffsetting;
     m_Features.FeatureLevel.Major = ((m_FeatureLevel >> 8) & 0xf0) >> 4;
     m_Features.FeatureLevel.Minor = (m_FeatureLevel >> 8) & 0xf;
@@ -733,6 +782,17 @@ CRHIDevice_DX11::CRHIDevice_DX11(
 
 void
 CRHIDevice_DX11::Release() {
+    m_ComputeShaders.Clear();
+    m_VertexShaders.Clear();
+    m_PixelShaders.Clear();
+    m_DomainShaders.Clear();
+    m_GeometryShaders.Clear();
+    m_HullShaders.Clear();
+    m_InputLayouts.Clear();
+    m_BlendStates.Clear();
+    m_RasterStates.Clear();
+    m_DepthStates.Clear();
+
     SafeRelease(m_Context);
 
     if (m_Debug) {
@@ -1135,6 +1195,48 @@ CRHIDevice_DX11::CreateGraphicsPipeline(const GraphicsPipelineInitInfo& info,
     depth.BackFace.StencilPassOp = ConvertStencilOp(info.DepthStencil.BackFace.StencilPassOp);
     depth.BackFace.StencilFunc = ConvertComparisonFunc(info.DepthStencil.BackFace.StencilFunc);
 
+    u64 il_hash{ vs_hash };
+
+    Vector<D3D11_INPUT_ELEMENT_DESC> input_elements{ info.InputAssembler.NumElements };
+    for (u32 i{ 0 }; i < info.InputAssembler.NumElements; ++i) {
+        const PipelineInputElementInitInfo& input{ info.InputAssembler.Elements[i] };
+
+        input_elements[i].SemanticName = input.Name;
+        input_elements[i].SemanticIndex = input.Index;
+        input_elements[i].Format = Shared::ConvertFormat(input.Format);
+        input_elements[i].InputSlot = input.InputSlot;
+        input_elements[i].AlignedByteOffset = input.AlignedOffset;
+        input_elements[i].InputSlotClass = input.Rate == InputRate::PerVertex
+            ? D3D11_INPUT_PER_VERTEX_DATA
+            : D3D11_INPUT_PER_INSTANCE_DATA;
+        input_elements[i].InstanceDataStepRate = input.InstanceStepRate;
+
+        il_hash = Shared::HashStruct(input_elements[i], il_hash);
+    }
+
+
+    if (input_elements.Size()) {
+        pipeline.IL = m_InputLayouts.Retrieve(il_hash);
+
+        if (!pipeline.IL.IsValid()) {
+            ID3D11InputLayout* state{ nullptr };
+            HRESULT hr{ S_OK };
+            hr = m_Device->CreateInputLayout(
+                input_elements.Data(),
+                input_elements.Size(),
+                info.VS.Blob,
+                info.VS.Size,
+                &state);
+
+            if (FAILED(hr)) {
+                LOG_HR(hr);
+                return Result::ECreateRHIObject;
+            }
+
+            pipeline.IL = m_InputLayouts.AddNewItem(il_hash, state);
+        }
+    }
+
     const u64 blend_hash{ Shared::HashStruct(blend, 1469598103934665603ull) };
     const u64 raster_hash{ Shared::HashStruct(rasterizer, 1469598103934665603ull) };
     const u64 depth_hash{ Shared::HashStruct(depth, 1469598103934665603ull) };
@@ -1320,6 +1422,7 @@ CRHIDevice_DX11::DestroyPipeline(RHIPipeline pso) {
         m_DomainShaders.Release(ref.DS);
         m_HullShaders.Release(ref.HS);
         m_GeometryShaders.Release(ref.GS);
+        m_InputLayouts.Release(ref.IL);
         m_BlendStates.Release(ref.Blend);
         m_RasterStates.Release(ref.Rasterizer);
         m_DepthStates.Release(ref.Depth);
@@ -1342,21 +1445,58 @@ CRHIDevice_DX11::GetFeatures(
     *features = m_Features;
 }
 
+Result::Code
+CRHIDevice_DX11::MapResource(RHIResource resource,
+    u32 subresource,
+    MapType::Type type,
+    void** data) const {
+    if (!data)
+        return Result::ENullptr;
+
+    const DenseResource& ptr{ ResolveResource(resource) };
+    if (!ptr.Resource)
+        return Result::EInvalidarg;
+
+    D3D11_MAPPED_SUBRESOURCE map{};
+
+    m_Context->Map(ptr.Resource, subresource, ConvertMapType(type), 0, &map);
+
+    *data = map.pData;
+
+    if (!*data)
+        return Result::ENomemory;
+
+    return Result::Ok;
+}
+
+void
+CRHIDevice_DX11::UnmapResource(RHIResource resource,
+    u32 subresource) const {
+    const DenseResource& ptr{ ResolveResource(resource) };
+    if (!ptr.Resource)
+        return;
+
+    m_Context->Unmap(ptr.Resource, subresource);
+}
+
 void* const
 CRHIDevice_DX11::GetNative() const {
     return m_Device;
 }
 
-ID3D11Resource* const
+const CRHIDevice_DX11::DenseResource
 CRHIDevice_DX11::ResolveResource(RHIResource handle) const {
+    if (!Id::IsValid(handle))
+        return {};
+
     u32 index{ Id::Index(handle) };
-    u32 gen{ Id::Index(handle) };
+    u32 gen{ Id::Generation(handle) };
 
     const auto& slot{ m_SparseResources[index] };
     if (slot.Generation != gen)
-        return nullptr;
+        return {};
 
-    return m_DenseResources[slot.DenseIndex].Resource;
+    return m_DenseResources[slot.DenseIndex];
 }
 
 const
@@ -1367,7 +1507,7 @@ CRHIDevice_DX11::ResolvePipelineData(RHIPipeline pso) const {
     }
 
     u32 index{ Id::Index(pso) };
-    u32 gen{ Id::Index(pso) };
+    u32 gen{ Id::Generation(pso) };
 
     const auto& slot{ m_Pipelines[index] };
     if (slot.Generation != gen)
@@ -1383,7 +1523,7 @@ CRHIDevice_DX11::ResolvePipelineLayout(RHIPipelineLayout layout) const {
     }
 
     u32 index{ Id::Index(layout) };
-    u32 gen{ Id::Index(layout) };
+    u32 gen{ Id::Generation(layout) };
 
     const auto& slot{ m_PipelineLayouts[index] };
     if (slot.Generation != gen)
@@ -1869,7 +2009,7 @@ CRHIFrameGraph_DX11::Execute(
         cmd_data.InitPCBuffer(1024);
     }
 
-    RHICommandBuilder builder{ 1024 * 1024 };
+    RHIGraphicsCommandList builder{ 1024 * 1024 };
     builder.Reset();
 
     for (auto& pass : m_Passes) {

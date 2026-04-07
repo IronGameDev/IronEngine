@@ -153,6 +153,7 @@
     <ClInclude Include="Engine.h" />
     <ClInclude Include="Src\EngineContext.h" />
     <ClInclude Include="Src\Modules\Modules.h" />
+    <ClInclude Include="Src\Renderer\Camera.h" />
     <ClInclude Include="Src\Renderer\PsoBuilder.h" />
     <ClInclude Include="Src\Renderer\Renderer.h" />
     <ClInclude Include="Src\Renderer\SceneLoader.h" />

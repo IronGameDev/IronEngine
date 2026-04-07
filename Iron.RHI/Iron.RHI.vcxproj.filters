@@ -18,7 +18,7 @@
     <ClCompile Include="Src\dllmain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Shared\Shared.cpp">
+    <ClCompile Include="Src\DXGIShared\Shared.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Src\D3D11\BackendDX11.cpp">
@@ -38,7 +38,7 @@
     <ClInclude Include="Src\D3D12\BackendDX12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Src\Shared\Shared.h">
+    <ClInclude Include="Src\DXGIShared\Shared.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="RHIDefines.h">

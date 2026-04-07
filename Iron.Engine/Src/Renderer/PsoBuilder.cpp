@@ -11,6 +11,8 @@ BuildPipelineFromJson(
     const char* path,
     RHI::IRHIDevice* const device,
     RHI::RHIPipeline* const pipeline) {
+    (void*)device;
+    (void*)pipeline;
     Result::Code res{ Result::Ok };
     u8* blob{};
     u64 length{};
@@ -32,5 +34,7 @@ BuildPipelineFromJson(
     }
 
     MemFree(blob);
+
+    return Result::Ok;
 }
 }

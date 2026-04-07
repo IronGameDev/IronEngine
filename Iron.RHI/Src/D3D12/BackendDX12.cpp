@@ -1,5 +1,4 @@
 #include <Iron.RHI/Src/D3D12/BackendDX12.h>
-#include <Iron.RHI/Src/Shared/Shared.h>
 
 #include <wrl.h>
 #include <format>
@@ -56,7 +55,7 @@ ConvertResourceDimension(FGResourceType::Type type) {
 constexpr D3D12_RESOURCE_FLAGS
 ConvertResourceFlags(ResourceFlags::Flags flags) {
     D3D12_RESOURCE_FLAGS value{};
-    if (!(flags & ResourceFlags::AllowShaderResource)) value |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
+    if (flags & ResourceFlags::DenyShaderResource) value |= D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE;
     return value;
 }
 
@@ -407,9 +406,9 @@ typedef void(*CommandFunc)(CommandListData&, const void*);
 void
 CopyResource(CommandListData& cmdData, const void* data) {
     const RHICommandBuilder::CmdCopyResourceInfo& info{ *(const RHICommandBuilder::CmdCopyResourceInfo*)data };
-    ID3D12Resource* const src{ cmdData.Device->ResolveResource(info.Src) };
-    ID3D12Resource* const dst{ cmdData.Device->ResolveResource(info.Dst) };
-    cmdData.List->CopyResource(dst, src);
+    const CRHIDevice_DX12::DenseResource& src{ cmdData.Device->ResolveResource(info.Src) };
+    const CRHIDevice_DX12::DenseResource& dst{ cmdData.Device->ResolveResource(info.Dst) };
+    cmdData.List->CopyResource(dst.Resource, src.Resource);
 }
 
 void
@@ -462,7 +461,6 @@ SetViewport(CommandListData& cmdData, const void* data) {
         vps[i].MinDepth = info.Views[i].MinDepth;
         vps[i].MaxDepth = info.Views[i].MaxDepth;
     }
-
     cmdData.List->RSSetViewports(info.Count, &vps[0]);
 }
 
@@ -482,7 +480,7 @@ SetScissor(CommandListData& cmdData, const void* data) {
 
 void
 SetPushConstants(CommandListData& cmdData, const void* data) {
-    const RHICommandBuilder::CmdSetPushConstants& info{ *(const RHICommandBuilder::CmdSetPushConstants*)data };
+    const RHICommandBuilder::CmdSetPushConstantsInfo& info{ *(const RHICommandBuilder::CmdSetPushConstantsInfo*)data };
     if (cmdData.GraphicsLayout) {
         if (cmdData.ResolvedLayout.NumConstants == 1) {
             cmdData.List->SetGraphicsRoot32BitConstant(
@@ -513,6 +511,24 @@ SetPushConstants(CommandListData& cmdData, const void* data) {
                 0);
         }
     }
+}
+
+void
+SetVertexBuffers(CommandListData& cmdData, const void* data) {
+    const RHICommandBuilder::CmdSetVertexBuffersInfo& info{ *(const RHICommandBuilder::CmdSetVertexBuffersInfo*)data };
+
+    D3D12_VERTEX_BUFFER_VIEW views[RHI_MAX_IA_VERTEX_ELEMENTS]{};
+
+    for (u32 i{ 0 }; i < info.NumBuffers; ++i) {
+        const VertexBufferBinding& b{ info.Bindings[i] };
+        const CRHIDevice_DX12::DenseResource& ptr{ cmdData.Device->ResolveResource(b.Buffer) };
+
+        views[i].BufferLocation = ptr.Address + b.Offset;
+        views[i].SizeInBytes = ptr.RowPitch - b.Offset;
+        views[i].StrideInBytes = b.Stride;
+    }
+
+    cmdData.List->IASetVertexBuffers(info.StartSlot, info.NumBuffers, &views[0]);
 }
 
 void
@@ -552,6 +568,7 @@ constexpr static CommandFunc DispatchTable[RHICommandBuilder::CommandId::Count]{
     SetViewport,
     SetScissor,
     SetPushConstants,
+    SetVertexBuffers,
     Draw,
     DrawInstanced,
     DrawIndexed,
@@ -559,13 +576,11 @@ constexpr static CommandFunc DispatchTable[RHICommandBuilder::CommandId::Count]{
 };
 
 void
-ParseCommandStream(RHICommandBuilder& builder, CommandListData& cmdData) {
-    if (!(builder.GetStream() && cmdData.List)) {
+ParseCommandStream(const u8* stream, u32 total_size, CommandListData& cmdData) {
+    if (!(stream && total_size && cmdData.List)) {
         return;
     }
 
-    const u32 total_size{ builder.GetOffset() };
-    const u8* stream{ builder.GetStream() };
     const u8* const end{ stream + total_size };
 
     while (stream < end) {
@@ -914,6 +929,190 @@ DX12BuddyAllocator::ValidateHandle(const HeapAllocInfo& alloc) {
     assert(!BBitTest(m_Split[alloc.Order], alloc.Index));
 }
 
+bool
+DX12CommandManager::Initialize(
+    ID3D12Device14* const device,
+    D3D12_COMMAND_LIST_TYPE type,
+    bool gpuTimeOut) {
+    if (!device) {
+        return false;
+    }
+
+    m_Device = device;
+
+    D3D12_COMMAND_QUEUE_DESC queue_desc{};
+    queue_desc.Type = type;
+    queue_desc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
+    queue_desc.Flags = gpuTimeOut
+        ? D3D12_COMMAND_QUEUE_FLAG_DISABLE_GPU_TIMEOUT
+        : D3D12_COMMAND_QUEUE_FLAG_NONE;
+    queue_desc.NodeMask = 0;
+
+    HRESULT hr{ S_OK };
+    hr = m_Device->CreateCommandQueue(&queue_desc,
+        IID_PPV_ARGS(&m_Queue));
+    if (FAILED(hr))
+        return false;
+
+    hr = m_Device->CreateFence(0,
+        D3D12_FENCE_FLAG_NONE,
+        IID_PPV_ARGS(&m_Fence));
+    if (FAILED(hr))
+        return false;
+
+    m_FenceEvent = CreateEventExA(nullptr, 0, 0, EVENT_ALL_ACCESS);
+    if (!m_FenceEvent)
+        return false;
+
+    return true;
+}
+
+void
+DX12CommandManager::Release() {
+    WaitAll();
+
+    for (auto& ctx : m_AvailCtx) {
+        SafeRelease(ctx.List);
+        SafeRelease(ctx.Alloc);
+    }
+
+    for (auto& ctx : m_InFlight) {
+        SafeRelease(ctx.Ctx.List);
+        SafeRelease(ctx.Ctx.Alloc);
+    }
+
+    SafeRelease(m_Queue);
+    SafeRelease(m_Fence);
+
+    CloseHandle(m_FenceEvent);
+
+    m_FenceEvent = nullptr;
+    m_FenceValue = 0;
+    m_AvailCtx = {};
+    m_InFlight = {};
+}
+
+DX12CommandManager::Context
+DX12CommandManager::Get() {
+    ReclaimCompleted();
+
+    if (!m_AvailCtx.empty()) {
+        Context ctx{ m_AvailCtx.back() };
+        m_AvailCtx.pop_back();
+        return ctx;
+    }
+
+    Context ctx{ CreateContext() };
+
+    if (!(ctx.List && ctx.Alloc)) {
+        return {};
+    }
+
+    return ctx;
+}
+u64
+DX12CommandManager::Submit(
+    Context* contexts,
+    u32 count,
+    CRHISurface_DX12* const surface,
+    bool vsync) {
+    if (!(contexts && count)) {
+        return max_u64;
+    }
+
+    if (count > RHI_MAX_CONTEXT_PER_SUBMIT) {
+        LOG_ERROR("DX12CommandManager::Submit() count should not be more than RHI_MAX_CONTEXT_PER_SUBMIT!");
+        return max_u64;
+    }
+
+    ID3D12CommandList* lists[RHI_MAX_CONTEXT_PER_SUBMIT]{};
+
+    u32 offset{ 0 };
+    for (u32 i{ 0 }; i < count; ++i) {
+        ID3D12GraphicsCommandList10* const ptr{ contexts[i].List };
+        if (!ptr)
+            continue;
+
+        ptr->Close();
+        lists[offset] = ptr;
+
+        ++offset;
+    }
+
+    if (!offset) {
+        LOG_ERROR("DX12CommandManager::Submit() no valid contexts to submit!");
+        return max_u64;
+    }
+
+    m_Queue->ExecuteCommandLists(offset, &lists[0]);
+
+    ////Present here
+    if (surface) {
+        surface->Present(vsync);
+    }
+
+    ++m_FenceValue;
+    m_Queue->Signal(m_Fence, m_FenceValue);
+
+    for (u32 i{ 0 }; i < count; ++i) {
+        m_InFlight.push_back({ contexts[i], m_FenceValue });
+    }
+
+    return m_FenceValue;
+}
+
+void
+DX12CommandManager::Wait(u64 fenceValue) {
+    if (!FenceCompleted(fenceValue)) {
+        m_Fence->SetEventOnCompletion(fenceValue, m_FenceEvent);
+        WaitForSingleObject(m_FenceEvent, INFINITE);
+    }
+}
+
+void
+DX12CommandManager::ReclaimCompleted() {
+    for (auto it{ m_InFlight.begin() }; it != m_InFlight.end(); ) {
+        if (FenceCompleted(it->Value)) {
+            it->Ctx.Reset();
+            m_AvailCtx.push_back(it->Ctx);
+            it = m_InFlight.erase(it);
+        }
+        else {
+            ++it;
+        }
+    }
+}
+
+DX12CommandManager::Context
+DX12CommandManager::CreateContext() {
+    if (!(m_Device && m_Queue))
+        return {};
+
+    Context ctx{};
+    HRESULT hr{ S_OK };
+    hr = m_Device->CreateCommandAllocator(
+        m_Type,
+        IID_PPV_ARGS(&ctx.Alloc));
+
+    if (FAILED(hr))
+        return {};
+
+    hr = m_Device->CreateCommandList(
+        0,
+        m_Type,
+        ctx.Alloc,
+        nullptr,
+        IID_PPV_ARGS(&ctx.List));
+
+    if (FAILED(hr)) {
+        SafeRelease(ctx.Alloc);
+        return {};
+    }
+
+    LOG_DEBUG("Created new D3D12 context!");
+    return ctx;
+}
+
 CRHIDevice_DX12::CRHIDevice_DX12(
     IRHIFactory* const factory,
     IRHIAdapter* const adapter,
@@ -921,13 +1120,12 @@ CRHIDevice_DX12::CRHIDevice_DX12(
     :
     m_Factory(factory),
     m_Debug(false),
+    m_DisableGPUTimeout(false),
     m_D3D12Dll(),
     m_D3D12CreateDevice(),
     m_D3D12GetDebugInterface(),
     m_FeatureLevel(),
     m_Device(),
-    m_GraphicsQueue(),
-    m_BufferHeaps(),
     m_SrvHeap(),
     m_SerializeRootSig(),
     m_Features() {
@@ -964,6 +1162,7 @@ CRHIDevice_DX12::CRHIDevice_DX12(
         }
         m_Debug = true;
     }
+    m_DisableGPUTimeout = info.DisableGPUTimeout;
 
     IUnknown* const dxgi_adapter{ (IUnknown* const)adapter->GetNative() };
 
@@ -1009,13 +1208,28 @@ CRHIDevice_DX12::CRHIDevice_DX12(
     queue_desc.Flags = info.DisableGPUTimeout ? D3D12_COMMAND_QUEUE_FLAG_DISABLE_GPU_TIMEOUT : D3D12_COMMAND_QUEUE_FLAG_NONE;
     queue_desc.NodeMask = 0;
 
-    hr = m_Device->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(&m_GraphicsQueue));
-    if (FAILED(hr)) {
+    if (!m_GraphicsMgr.Initialize(
+        m_Device,
+        D3D12_COMMAND_LIST_TYPE_DIRECT,
+        m_DisableGPUTimeout)) {
         LOG_ERROR("Failed to create graphics command queue!");
         return;
     }
+    if (!m_ComputeMgr.Initialize(
+        m_Device,
+        D3D12_COMMAND_LIST_TYPE_COMPUTE,
+        m_DisableGPUTimeout)) {
+        LOG_ERROR("Failed to create compute command queue!");
+        return;
+    }
+    if (!m_CopyMgr.Initialize(
+        m_Device,
+        D3D12_COMMAND_LIST_TYPE_COPY,
+        m_DisableGPUTimeout)) {
+        LOG_ERROR("Failed to create copy command queue!");
+        return;
+    }
 
-    m_BufferHeaps.Initialize(m_Device, ResourceUsage::Default);
     m_SrvHeap.Initialize(m_Device, info.MaxShaderResources, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true);
 
     D3D12_FEATURE_DATA_D3D12_OPTIONS d3d12_options{ QueryFeatureSupport<D3D12_FEATURE_DATA_D3D12_OPTIONS>() };
@@ -1024,6 +1238,7 @@ CRHIDevice_DX12::CRHIDevice_DX12(
     m_Features.Bindless = (d3d12_options.ResourceBindingTier == D3D12_RESOURCE_BINDING_TIER_3
         && shader_model.HighestShaderModel >= D3D_SHADER_MODEL_6_0);
     m_Features.PushConstants = true;
+    m_Features.PersistentMapping = true;
     m_Features.ShaderModel.Major = (shader_model.HighestShaderModel & 0xf0) >> 4;
     m_Features.ShaderModel.Minor = shader_model.HighestShaderModel & 0xf;
     m_Features.FeatureLevel.Major = ((m_FeatureLevel >> 8) & 0xf0) >> 4;
@@ -1032,10 +1247,10 @@ CRHIDevice_DX12::CRHIDevice_DX12(
 
 void
 CRHIDevice_DX12::Release() {
-    m_BufferHeaps.Release();
     m_SrvHeap.Release();
-
-    SafeRelease(m_GraphicsQueue);
+    m_GraphicsMgr.Release();
+    m_ComputeMgr.Release();
+    m_CopyMgr.Release();
 
     if (m_Debug) {
         {
@@ -1074,45 +1289,52 @@ CRHIDevice_DX12::CreateResource(const ResourceInitInfo& info,
     desc.MipLevels = (u16)info.MipLevels;
     desc.Format = Shared::ConvertFormat(info.Format);
     desc.SampleDesc = { 1, 0 };
-    desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    if (info.Dimension == ResourceDimension::Buffer) {
+        desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    }
+    else {
+        desc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+    }
     desc.Flags = ConvertResourceFlags((ResourceFlags::Flags)info.Flags);
 
-    D3D12_RESOURCE_ALLOCATION_INFO alloc_info{
-        m_Device->GetResourceAllocationInfo(
-            0,
-            1,
-            &desc
-        )
-    };
+    D3D12_HEAP_PROPERTIES props{};
+    if (info.CPUWrite) {
+        props.Type = D3D12_HEAP_TYPE_UPLOAD;
+    }
+    else if (info.CPURead) {
+        props.Type = D3D12_HEAP_TYPE_READBACK;
+    }
+    else {
+        props.Type = D3D12_HEAP_TYPE_DEFAULT;
+    }
+
+    props.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    props.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    props.CreationNodeMask = 0;
+    props.VisibleNodeMask = 0;
 
     DenseResource dense{};
 
-    switch (info.Dimension)
-    {
-    case ResourceDimension::Buffer: {
-        dense.Info = { m_BufferHeaps.Allocate(alloc_info.SizeInBytes) };
-        if (!(dense.Info.Heap && dense.Info.Size == alloc_info.SizeInBytes)) {
-            return Result::ENomemory;
-        }
+    HRESULT hr{ S_OK };
+    hr = m_Device->CreateCommittedResource(
+        &props,
+        D3D12_HEAP_FLAG_CREATE_NOT_ZEROED,
+        &desc,
+        D3D12_RESOURCE_STATE_COMMON,
+        nullptr,
+        IID_PPV_ARGS(&dense.Resource));
 
-        HRESULT hr{ S_OK };
-        hr = m_Device->CreatePlacedResource(
-            dense.Info.Heap,
-            dense.Info.Offset,
-            &desc,
-            D3D12_RESOURCE_STATE_COMMON,
-            nullptr,
-            IID_PPV_ARGS(&dense.Resource));
-        if (FAILED(hr)) {
-            return Result::ECreateResource;
-        }
-    } break;
-    default:
-        break;
+    if (FAILED(hr)) {
+        return Result::ECreateResource;
     }
 
     if (!dense.Resource) {
         return Result::ECreateResource;
+    }
+
+    if (info.Dimension == ResourceDimension::Buffer) {
+        dense.Address = dense.Resource->GetGPUVirtualAddress();
+        dense.RowPitch = info.Width;
     }
 
     u32 sparse_index{};
@@ -1156,7 +1378,11 @@ CRHIDevice_DX12::CreatePipelineLayout(const PipelineLayoutInitInfo& info,
         D3D12_ROOT_PARAMETER root{};
         root.ShaderVisibility = ConvertVisibility(param.Visibility);
 
-        bool isTable = param.Count > 1 || param.Bindless;
+        bool isTable =
+            param.Bindless ||
+            param.Count > 1 ||
+            param.Type == PipelineLayoutParamType::ShaderResource ||
+            param.Type == PipelineLayoutParamType::Sampler;
 
         if (!isTable) {
             switch (param.Type) {
@@ -1553,7 +1779,7 @@ CRHIDevice_DX12::DestroyResource(
     DenseResource& removed{ m_DenseResources[dense_index] };
 
     SafeRelease(removed.Resource);
-    m_BufferHeaps.Free(removed.Info);
+    //m_BufferHeaps.Free(removed.Info);
 
     std::swap(m_DenseResources[dense_index], m_DenseResources[last_dense]);
 
@@ -1629,27 +1855,98 @@ CRHIDevice_DX12::GetFeatures(
     *features = m_Features;
 }
 
+Result::Code
+CRHIDevice_DX12::MapResource(RHIResource resource,
+    u32 subresource,
+    MapType::Type type,
+    void** data) const {
+    UNREFERENCED_PARAMETER(type);
+
+    if (!data)
+        return Result::ENullptr;
+
+    const DenseResource& ptr{ ResolveResource(resource) };
+    if (!ptr.Resource)
+        return Result::EInvalidarg;
+
+    ptr.Resource->Map(subresource, nullptr, data);
+    if (!*data)
+        return Result::ENomemory;
+
+    return Result::Ok;
+}
+
+void
+CRHIDevice_DX12::UnmapResource(RHIResource resource,
+    u32 subresource) const {
+    const DenseResource& ptr{ ResolveResource(resource) };
+    if (!ptr.Resource)
+        return;
+
+    ptr.Resource->Unmap(subresource, nullptr);
+}
+
+u64
+CRHIDevice_DX12::CopySubmitList(
+    RHICopyCommandList& list) {
+    auto ctx{ m_CopyMgr.Get() };
+    Cmd::CommandListData data{};
+    data.Device = this;
+    data.List = ctx.List;
+
+    Cmd::ParseCommandStream(list.GetStream(), list.GetOffset(), data);
+    list.Reset();
+
+    return m_CopyMgr.Submit(&ctx, 1, nullptr);
+}
+
+void
+CRHIDevice_DX12::CopyWaitFence(
+    u64 fenceValue) {
+    m_CopyMgr.Wait(fenceValue);
+}
+
+void
+CRHIDevice_DX12::CopySubmitAndWait(
+    RHICopyCommandList& list) {
+    const u64 fence{ CopySubmitList(list) };
+    if (fence == max_u64)
+        return;
+
+    CopyWaitFence(fence);
+}
+
+void
+CRHIDevice_DX12::WaitAllCommands() {
+    m_GraphicsMgr.WaitAll();
+    m_ComputeMgr.WaitAll();
+    m_CopyMgr.WaitAll();
+}
+
 void* const
 CRHIDevice_DX12::GetNative() const {
     return m_Device;
 }
 
-ID3D12Resource* const
+CRHIDevice_DX12::DenseResource
 CRHIDevice_DX12::ResolveResource(RHIResource handle) const {
+    if (!Id::IsValid(handle))
+        return {};
+
     u32 index{ Id::Index(handle) };
-    u32 gen{ Id::Index(handle) };
+    u32 gen{ Id::Generation(handle) };
 
     const auto& slot{ m_SparseResources[index] };
     if (slot.Generation != gen)
-        return nullptr;
+        return {};
 
-    return m_DenseResources[slot.DenseIndex].Resource;
+    return m_DenseResources[slot.DenseIndex];
 }
 
 CRHIDevice_DX12::PipelineLayout
 CRHIDevice_DX12::ResolveLayout(RHIPipelineLayout layout) const {
     u32 index{ Id::Index(layout) };
-    u32 gen{ Id::Index(layout) };
+    u32 gen{ Id::Generation(layout) };
 
     const auto& data{ m_PipelineLayouts[index] };
     if (data.Generation != gen)
@@ -1661,7 +1958,7 @@ CRHIDevice_DX12::ResolveLayout(RHIPipelineLayout layout) const {
 ID3D12PipelineState* const
 CRHIDevice_DX12::ResolvePso(RHIPipeline pso) const {
     u32 index{ Id::Index(pso) };
-    u32 gen{ Id::Index(pso) };
+    u32 gen{ Id::Generation(pso) };
 
     const auto& data{ m_Pipelines[index] };
     if (data.Generation != gen)
@@ -1712,7 +2009,7 @@ CRHISurface_DX12::CRHISurface_DX12(
     m_DescriptorSize(),
     m_CurrentBB() {
     if (!(device && factory &&
-        info.Native && device->GetGraphicsQueue()
+        info.Native && device->GetGraphics().GetQueue()
         && factory->GetNative())) {
         return;
     }
@@ -1739,7 +2036,7 @@ CRHISurface_DX12::CRHISurface_DX12(
 
     HRESULT hr{ S_OK };
     hr = dxgi->CreateSwapChainForHwnd(
-        device->GetGraphicsQueue(),
+        device->GetGraphics().GetQueue(),
         hwnd,
         &swap_desc,
         nullptr,
@@ -1860,16 +2157,6 @@ CRHIFrameGraph_DX12::Initialize(
     const Vector<RHIGraphBuilder::FGPassDesc>& passes{ builder.GetPasses() };
     const Vector<FGResourceInitInfo>& resources{ builder.GetResources() };
     const bool debug_names{ (const bool)(flags & FGCompileFlags::DebugNames) };
-
-    {
-        Result::Code res{ m_Queue.Initialize(
-            d3d12,
-            device->GetGraphicsQueue(),
-            D3D12_COMMAND_LIST_TYPE_DIRECT) };
-        if (Result::Fail(res)) {
-            return res;
-        }
-    }
 
     m_Passes.Resize(sorted.Size());
     for (u32 i{ 0 }; i < m_Passes.Size(); ++i) {
@@ -2293,7 +2580,6 @@ CRHIFrameGraph_DX12::Initialize(
 
 void
 CRHIFrameGraph_DX12::Release() {
-    m_Queue.Release();
     m_RtvHeap.Release();
     m_DsvHeap.Release();
 
@@ -2310,13 +2596,13 @@ CRHIFrameGraph_DX12::Execute(
     u64 frameNumber) {
     CRHISurface_DX12* const dx_surface{ (CRHISurface_DX12* const)surface };
 
-    m_Queue.Begin();
+    auto ctx{ m_Parent->GetGraphics().Get() };
 
     Cmd::CommandListData cmd_data{};
-    cmd_data.List = m_Queue.List;
+    cmd_data.List = ctx.List;
     cmd_data.Device = m_Parent;
-    //Dont realloc every frame!
-    RHICommandBuilder builder{ 1024 * 1024 };
+    //TODO: Dont realloc every frame!
+    RHIGraphicsCommandList builder{ 1024 * 1024 };
     builder.Reset();
 
     ID3D12Resource* const surface_buffer{ (ID3D12Resource* const)dx_surface->GetNativeBuffer(dx_surface->GetCurrentBBIndex()) };
@@ -2401,7 +2687,7 @@ CRHIFrameGraph_DX12::Execute(
         cmd_data.List->OMSetRenderTargets(num_rtvs, &targets[0], FALSE, has_dsv ? &depth : nullptr);
 
         pass.Func(builder);
-        Cmd::ParseCommandStream(builder, cmd_data);
+        Cmd::ParseCommandStream(builder.GetStream(), builder.GetOffset(), cmd_data);
         builder.Reset();
     }
 
@@ -2416,14 +2702,11 @@ CRHIFrameGraph_DX12::Execute(
     barriers.Add(present_barrier);
     barriers.Apply(cmd_data.List);
 
-    m_Queue.End(dx_surface);
+    m_Parent->GetGraphics().Submit(&ctx,
+        1,
+        dx_surface,
+        false);
 }
-
-void
-CRHIFrameGraph_DX12::WaitIdle() {
-    m_Queue.Flush();
-}
-
 
 Vector<Vector<u32>>
 CRHIFrameGraph_DX12::GetDependencies(
