@@ -662,6 +662,53 @@ private:
     }
 };
 
+template<typename T>
+class TArray {
+public:
+    TArray() = default;
+
+    TArray(u32 size) {
+        Grow(size);
+    }
+
+    ~TArray() {
+        MemFree(m_Data);
+    }
+
+    void Grow(u32 size) {
+        if(size > m_Size) {
+            T* block{ (T*)MemAlloc(size * sizeof(T)) };
+            if(block) {
+                m_Data = block;
+                m_Size = size;
+            }
+        }
+    }
+
+    T& operator[](size_t Index) {
+        return m_Data[(u32)Index];
+    }
+
+    const T& operator[](size_t Index) const {
+        return m_Data[(u32)Index];
+    }
+
+    inline T* Data() { return m_Data; }
+    inline const T* Data() const { return m_Data; }
+
+    inline T* begin() { return m_Data; }
+    inline const T* begin() const { return m_Data; }
+
+    inline T* end() { return &m_Data[m_Size]; }
+    inline const T* end() const { return &m_Data[m_Size]; }
+
+    constexpr u32 Size() const { return m_Size; }
+
+private:
+    T*      m_Data{ nullptr };
+    u32     m_Size{ 0 };
+};
+
 class ConfigFile {
 public:
     ConfigFile() = default;
