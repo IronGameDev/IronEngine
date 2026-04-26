@@ -24,6 +24,7 @@ public:
 private:
     u8*         m_Data{ nullptr };
     TArray<u8*> m_ComponentPointers{};
+    EntityId*   m_Entities{};
     u32         m_MaxEntities{};
 };
 

@@ -16,6 +16,7 @@ CalculateMaxEntities(TArray<SComponentInfo>& components) {
 CComponentChunk::CComponentChunk(TArray<SComponentInfo>& components) {
     m_MaxEntities = CalculateMaxEntities(components);
     m_Data = MemAlloc(ChunkSize);
+    m_Entities = m_Data;
 }
 
 EntityId
